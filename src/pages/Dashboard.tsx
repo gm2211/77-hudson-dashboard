@@ -26,7 +26,6 @@ export default function Dashboard() {
     return () => es.close();
   }, [fetchAll]);
 
-  const hasAdvisory = advisories.some(a => a.active);
   const scrollSpeed = config?.scrollSpeed ?? 30;
 
   return (

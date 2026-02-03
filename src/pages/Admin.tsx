@@ -1,12 +1,23 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Service, Event, Advisory, BuildingConfig } from '../types';
 
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
 const api = {
   get: (url: string) => fetch(url).then(r => r.json()),
-  post: (url: string, body?: any) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(r => r.json()),
-  put: (url: string, body: any) => fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json()),
+  post: (url: string, body?: any) => fetch(url, { method: 'POST', headers: JSON_HEADERS, body: body ? JSON.stringify(body) : undefined }).then(r => r.json()),
+  put: (url: string, body: any) => fetch(url, { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(body) }).then(r => r.json()),
   del: (url: string) => fetch(url, { method: 'DELETE' }).then(r => r.json()),
 };
+
+function useTrash<T>(endpoint: string, onSave: () => void) {
+  const [trash, setTrash] = useState<T[]>([]);
+  const loadTrash = useCallback(() => { api.get(`${endpoint}/trash`).then(setTrash); }, [endpoint]);
+  useEffect(() => { loadTrash(); }, [loadTrash]);
+  const reload = () => { onSave(); loadTrash(); };
+  const remove = async (id: number) => { await api.del(`${endpoint}/${id}`); reload(); };
+  return { trash, reload, remove };
+}
 
 export default function Admin() {
   const [services, setServices] = useState<Service[]>([]);
@@ -24,16 +35,18 @@ export default function Admin() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <h1>Hudson Dashboard — Admin</h1>
-        <a href="/" style={styles.link}>← View Dashboard</a>
-      </header>
+    <div style={styles.pageWrap}>
+      <div style={styles.page}>
+        <header style={styles.header}>
+          <h1>Hudson Dashboard — Admin</h1>
+          <a href="/" style={styles.link}>← View Dashboard</a>
+        </header>
 
-      <ConfigSection config={config} onSave={load} />
-      <ServicesSection services={services} onSave={load} />
-      <EventsSection events={events} onSave={load} />
-      <AdvisoriesSection advisories={advisories} onSave={load} />
+        <ConfigSection config={config} onSave={load} />
+        <ServicesSection services={services} onSave={load} />
+        <EventsSection events={events} onSave={load} />
+        <AdvisoriesSection advisories={advisories} onSave={load} />
+      </div>
     </div>
   );
 }
@@ -108,22 +121,12 @@ function TrashSection<T extends { id: number }>({ type, items, labelFn, onReload
 function ServicesSection({ services, onSave }: { services: Service[]; onSave: () => void }) {
   const [name, setName] = useState('');
   const [status, setStatus] = useState('Operational');
-  const [trash, setTrash] = useState<Service[]>([]);
-
-  const loadTrash = useCallback(() => { api.get('/api/services/trash').then(setTrash); }, []);
-  useEffect(() => { loadTrash(); }, [loadTrash]);
-
-  const reload = () => { onSave(); loadTrash(); };
+  const { trash, reload, remove } = useTrash<Service>('/api/services', onSave);
 
   const add = async () => {
     if (!name) return;
     await api.post('/api/services', { name, status, sortOrder: services.length });
     setName('');
-    reload();
-  };
-
-  const remove = async (id: number) => {
-    await api.del(`/api/services/${id}`);
     reload();
   };
 
@@ -211,12 +214,7 @@ function ImagePicker({ value, onChange }: { value: string; onChange: (v: string)
 function EventsSection({ events, onSave }: { events: Event[]; onSave: () => void }) {
   const empty = { title: '', subtitle: '', details: '' as string, imageUrl: '', accentColor: '#00bcd4' };
   const [form, setForm] = useState(empty);
-  const [trash, setTrash] = useState<Event[]>([]);
-
-  const loadTrash = useCallback(() => { api.get('/api/events/trash').then(setTrash); }, []);
-  useEffect(() => { loadTrash(); }, [loadTrash]);
-
-  const reload = () => { onSave(); loadTrash(); };
+  const { trash, reload, remove } = useTrash<Event>('/api/events', onSave);
 
   const add = async () => {
     if (!form.title) return;
@@ -229,11 +227,6 @@ function EventsSection({ events, onSave }: { events: Event[]; onSave: () => void
       sortOrder: events.length,
     });
     setForm(empty);
-    reload();
-  };
-
-  const remove = async (id: number) => {
-    await api.del(`/api/events/${id}`);
     reload();
   };
 
@@ -309,23 +302,13 @@ function LabelPicker({ value, onChange, style }: { value: string; onChange: (v: 
 }
 
 function AdvisoriesSection({ advisories, onSave }: { advisories: Advisory[]; onSave: () => void }) {
-  const [form, setForm] = useState({ label: 'RESIDENT ADVISORY', message: '' });
-  const [trash, setTrash] = useState<Advisory[]>([]);
-
-  const loadTrash = useCallback(() => { api.get('/api/advisories/trash').then(setTrash); }, []);
-  useEffect(() => { loadTrash(); }, [loadTrash]);
-
-  const reload = () => { onSave(); loadTrash(); };
+  const [form, setForm] = useState({ label: ADVISORY_PRESETS[0], message: '' });
+  const { trash, reload, remove } = useTrash<Advisory>('/api/advisories', onSave);
 
   const add = async () => {
     if (!form.message) return;
     await api.post('/api/advisories', form);
-    setForm({ label: 'RESIDENT ADVISORY', message: '' });
-    reload();
-  };
-
-  const remove = async (id: number) => {
-    await api.del(`/api/advisories/${id}`);
+    setForm({ label: ADVISORY_PRESETS[0], message: '' });
     reload();
   };
 
@@ -365,7 +348,8 @@ function AdvisoriesSection({ advisories, onSave }: { advisories: Advisory[]; onS
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { maxWidth: '900px', margin: '0 auto', padding: '24px', color: '#e0e0e0', background: '#0a1628', minHeight: '100vh' },
+  pageWrap: { background: '#0a1628', minHeight: '100vh' },
+  page: { maxWidth: '900px', margin: '0 auto', padding: '24px', color: '#e0e0e0' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #1a3050', paddingBottom: '16px' },
   link: { color: '#00bcd4', textDecoration: 'none' },
   section: { background: '#132038', borderRadius: '12px', border: '1px solid #1a3050', padding: '20px', marginBottom: '20px' },

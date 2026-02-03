@@ -1,16 +1,14 @@
 import { Router } from 'express';
 import prisma from '../db.js';
 import { broadcast } from '../sse.js';
+import { addSoftDeleteRoutes } from './softDelete.js';
 
 const router = Router();
 
+addSoftDeleteRoutes(router, prisma.advisory);
+
 router.get('/', async (_req, res) => {
   const advisories = await prisma.advisory.findMany({ where: { deletedAt: null } });
-  res.json(advisories);
-});
-
-router.get('/trash', async (_req, res) => {
-  const advisories = await prisma.advisory.findMany({ where: { deletedAt: { not: null } } });
   res.json(advisories);
 });
 
@@ -31,18 +29,6 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   await prisma.advisory.update({ where: { id: Number(req.params.id) }, data: { deletedAt: new Date() } });
-  res.json({ ok: true });
-  broadcast();
-});
-
-router.post('/:id/restore', async (req, res) => {
-  await prisma.advisory.update({ where: { id: Number(req.params.id) }, data: { deletedAt: null } });
-  res.json({ ok: true });
-  broadcast();
-});
-
-router.delete('/:id/purge', async (req, res) => {
-  await prisma.advisory.delete({ where: { id: Number(req.params.id) } });
   res.json({ ok: true });
   broadcast();
 });

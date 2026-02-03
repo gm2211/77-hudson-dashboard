@@ -4,12 +4,20 @@ export default function AdvisoryTicker({ advisories }: { advisories: Advisory[] 
   const active = advisories.filter(a => a.active);
   if (active.length === 0) return null;
 
-  const text = active.map(a => `${a.label}: ${a.message}`).join('   •   ');
+  const labels = active.map(a => (
+    <span key={a.id} style={styles.segment}>
+      <span style={styles.label}>{a.label}</span>
+      <span style={styles.message}>{a.message}</span>
+    </span>
+  ));
 
   return (
     <div style={styles.ticker}>
-      <div style={styles.scrollWrap}>
-        <span style={styles.scrollText}>{text}&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;{text}</span>
+      <div style={styles.track}>
+        <div style={styles.scroll}>
+          {labels}
+          {labels}
+        </div>
       </div>
       <style>{`
         @keyframes ticker-scroll {
@@ -23,23 +31,40 @@ export default function AdvisoryTicker({ advisories }: { advisories: Advisory[] 
 
 const styles: Record<string, React.CSSProperties> = {
   ticker: {
-    background: '#ffc107',
-    padding: '10px 0',
+    background: '#f5c842',
+    flexShrink: 0,
     overflow: 'hidden',
-    position: 'fixed',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 100,
   },
-  scrollWrap: {
-    display: 'inline-block',
+  track: {
+    overflow: 'hidden',
+    padding: '12px 0',
+  },
+  scroll: {
+    display: 'inline-flex',
+    alignItems: 'center',
     whiteSpace: 'nowrap',
-    animation: 'ticker-scroll 30s linear infinite',
+    animation: 'ticker-scroll 25s linear infinite',
   },
-  scrollText: {
-    fontSize: '14px',
-    fontWeight: 600,
-    color: '#333',
+  segment: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '16px',
+    marginRight: '60px',
+  },
+  label: {
+    background: '#c0392b',
+    color: '#fff',
+    fontSize: '13px',
+    fontWeight: 700,
+    padding: '5px 14px',
+    borderRadius: '3px',
+    whiteSpace: 'nowrap',
+    letterSpacing: '0.5px',
+  },
+  message: {
+    fontSize: '18px',
+    fontWeight: 500,
+    color: '#222',
+    whiteSpace: 'nowrap',
   },
 };

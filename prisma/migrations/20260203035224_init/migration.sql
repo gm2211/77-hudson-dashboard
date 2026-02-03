@@ -4,7 +4,8 @@ CREATE TABLE "Service" (
     "name" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'Operational',
     "lastChecked" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "sortOrder" INTEGER NOT NULL DEFAULT 0
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "deletedAt" DATETIME
 );
 
 -- CreateTable
@@ -15,7 +16,8 @@ CREATE TABLE "Event" (
     "details" TEXT NOT NULL DEFAULT '[]',
     "imageUrl" TEXT NOT NULL DEFAULT '',
     "accentColor" TEXT NOT NULL DEFAULT '',
-    "sortOrder" INTEGER NOT NULL DEFAULT 0
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "deletedAt" DATETIME
 );
 
 -- CreateTable
@@ -23,7 +25,8 @@ CREATE TABLE "Advisory" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "label" TEXT NOT NULL DEFAULT 'RESIDENT ADVISORY',
     "message" TEXT NOT NULL,
-    "active" BOOLEAN NOT NULL DEFAULT true
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "deletedAt" DATETIME
 );
 
 -- CreateTable
@@ -31,5 +34,6 @@ CREATE TABLE "BuildingConfig" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "buildingNumber" TEXT NOT NULL DEFAULT '77',
     "buildingName" TEXT NOT NULL DEFAULT 'Hudson Dashboard',
-    "subtitle" TEXT NOT NULL DEFAULT 'Real-time System Monitor'
+    "subtitle" TEXT NOT NULL DEFAULT 'Real-time System Monitor',
+    "scrollSpeed" INTEGER NOT NULL DEFAULT 30
 );
