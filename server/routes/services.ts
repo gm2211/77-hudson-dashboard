@@ -5,7 +5,12 @@ import { broadcast } from '../sse.js';
 const router = Router();
 
 router.get('/', async (_req, res) => {
-  const services = await prisma.service.findMany({ orderBy: { sortOrder: 'asc' } });
+  const services = await prisma.service.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } });
+  res.json(services);
+});
+
+router.get('/trash', async (_req, res) => {
+  const services = await prisma.service.findMany({ where: { deletedAt: { not: null } }, orderBy: { sortOrder: 'asc' } });
   res.json(services);
 });
 
@@ -25,6 +30,18 @@ router.put('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
+  await prisma.service.update({ where: { id: Number(req.params.id) }, data: { deletedAt: new Date() } });
+  res.json({ ok: true });
+  broadcast();
+});
+
+router.post('/:id/restore', async (req, res) => {
+  await prisma.service.update({ where: { id: Number(req.params.id) }, data: { deletedAt: null } });
+  res.json({ ok: true });
+  broadcast();
+});
+
+router.delete('/:id/purge', async (req, res) => {
   await prisma.service.delete({ where: { id: Number(req.params.id) } });
   res.json({ ok: true });
   broadcast();

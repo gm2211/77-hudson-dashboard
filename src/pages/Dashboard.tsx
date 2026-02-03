@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '../components/Header';
 import ServiceTable from '../components/ServiceTable';
 import EventCard from '../components/EventCard';
@@ -26,29 +26,108 @@ export default function Dashboard() {
     return () => es.close();
   }, [fetchAll]);
 
+  const hasAdvisory = advisories.some(a => a.active);
+  const scrollSpeed = config?.scrollSpeed ?? 30;
+
   return (
-    <div style={{ minHeight: '100vh', paddingBottom: '50px' }}>
+    <div style={styles.page}>
       <Header config={config} />
       <div style={styles.body}>
-        <div style={styles.left}>
-          <ServiceTable services={services} />
-        </div>
-        <div style={styles.right}>
-          <h2 style={styles.heading}>Events & Announcements</h2>
-          <div style={styles.cards}>
-            {events.map(e => <EventCard key={e.id} event={e} />)}
-          </div>
-        </div>
+        <ServiceTable services={services} />
+        <AutoScrollCards events={events} scrollSpeed={scrollSpeed} />
       </div>
       <AdvisoryTicker advisories={advisories} />
+      <style>{`
+        html, body { overflow: hidden; height: 100%; }
+        #root { height: 100%; }
+      `}</style>
+    </div>
+  );
+}
+
+function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed: number }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [needsScroll, setNeedsScroll] = useState(false);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const inner = innerRef.current;
+    if (!container || !inner) return;
+
+    const check = () => {
+      setNeedsScroll(inner.scrollHeight > container.clientHeight);
+    };
+    check();
+    const obs = new ResizeObserver(check);
+    obs.observe(container);
+    obs.observe(inner);
+    return () => obs.disconnect();
+  }, [events]);
+
+  useEffect(() => {
+    if (!needsScroll || scrollSpeed === 0) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    let animId: number;
+    let lastTime: number | null = null;
+    // scrollSpeed is pixels per second
+    const pxPerMs = scrollSpeed / 1000;
+
+    const step = (time: number) => {
+      if (lastTime !== null) {
+        const dt = time - lastTime;
+        container.scrollTop += pxPerMs * dt;
+
+        // When we've scrolled past the first set, jump back to create seamless loop
+        const halfScroll = container.scrollHeight / 2;
+        if (container.scrollTop >= halfScroll) {
+          container.scrollTop -= halfScroll;
+        }
+      }
+      lastTime = time;
+      animId = requestAnimationFrame(step);
+    };
+
+    animId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animId);
+  }, [needsScroll, scrollSpeed]);
+
+  // When scrolling, duplicate cards for seamless loop
+  const displayEvents = needsScroll ? [...events, ...events] : events;
+
+  return (
+    <div ref={containerRef} style={styles.cards}>
+      <div ref={innerRef} style={styles.cardsInner}>
+        {displayEvents.map((e, i) => <EventCard key={`${e.id}-${i}`} event={e} />)}
+      </div>
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  body: { display: 'flex', gap: '24px', padding: '24px', alignItems: 'flex-start' },
-  left: { flex: '0 0 55%', display: 'flex' },
-  right: { flex: 1 },
-  heading: { fontSize: '16px', fontWeight: 600, color: '#fff', marginBottom: '16px' },
-  cards: { display: 'flex', flexDirection: 'column', gap: '16px' },
+  page: {
+    height: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  },
+  body: {
+    flex: 1,
+    padding: '20px 40px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    overflow: 'hidden',
+  },
+  cards: {
+    flex: 1,
+    overflow: 'hidden',
+  },
+  cardsInner: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+  },
 };

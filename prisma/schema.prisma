@@ -8,28 +8,31 @@ datasource db {
 }
 
 model Service {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   name        String
-  status      String   @default("Operational")
-  lastChecked DateTime @default(now())
-  sortOrder   Int      @default(0)
+  status      String    @default("Operational")
+  lastChecked DateTime  @default(now())
+  sortOrder   Int       @default(0)
+  deletedAt   DateTime?
 }
 
 model Event {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   title       String
-  subtitle    String   @default("")
-  details     String   @default("[]")
-  imageUrl    String   @default("")
-  accentColor String   @default("")
-  sortOrder   Int      @default(0)
+  subtitle    String    @default("")
+  details     String    @default("[]")
+  imageUrl    String    @default("")
+  accentColor String    @default("")
+  sortOrder   Int       @default(0)
+  deletedAt   DateTime?
 }
 
 model Advisory {
-  id      Int      @id @default(autoincrement())
-  label   String   @default("RESIDENT ADVISORY")
-  message String
-  active  Boolean  @default(true)
+  id        Int       @id @default(autoincrement())
+  label     String    @default("RESIDENT ADVISORY")
+  message   String
+  active    Boolean   @default(true)
+  deletedAt DateTime?
 }
 
 model BuildingConfig {
@@ -37,4 +40,5 @@ model BuildingConfig {
   buildingNumber String @default("77")
   buildingName   String @default("Hudson Dashboard")
   subtitle       String @default("Real-time System Monitor")
+  scrollSpeed    Int    @default(30)
 }

@@ -3,7 +3,7 @@ import type { Service, Event, Advisory, BuildingConfig } from '../types';
 
 const api = {
   get: (url: string) => fetch(url).then(r => r.json()),
-  post: (url: string, body: any) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json()),
+  post: (url: string, body?: any) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(r => r.json()),
   put: (url: string, body: any) => fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json()),
   del: (url: string) => fetch(url, { method: 'DELETE' }).then(r => r.json()),
 };
@@ -39,10 +39,10 @@ export default function Admin() {
 }
 
 function ConfigSection({ config, onSave }: { config: BuildingConfig | null; onSave: () => void }) {
-  const [form, setForm] = useState({ buildingNumber: '', buildingName: '', subtitle: '' });
+  const [form, setForm] = useState({ buildingNumber: '', buildingName: '', subtitle: '', scrollSpeed: 30 });
 
   useEffect(() => {
-    if (config) setForm({ buildingNumber: config.buildingNumber, buildingName: config.buildingName, subtitle: config.subtitle });
+    if (config) setForm({ buildingNumber: config.buildingNumber, buildingName: config.buildingName, subtitle: config.subtitle, scrollSpeed: config.scrollSpeed });
   }, [config]);
 
   const save = async () => {
@@ -57,26 +57,74 @@ function ConfigSection({ config, onSave }: { config: BuildingConfig | null; onSa
         <input style={styles.input} placeholder="Building #" value={form.buildingNumber} onChange={e => setForm({ ...form, buildingNumber: e.target.value })} />
         <input style={styles.input} placeholder="Building Name" value={form.buildingName} onChange={e => setForm({ ...form, buildingName: e.target.value })} />
         <input style={styles.input} placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
+        <label style={{ color: '#e0e0e0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          Scroll speed
+          <input style={{ ...styles.input, width: '60px' }} type="number" min="0" max="200" value={form.scrollSpeed} onChange={e => setForm({ ...form, scrollSpeed: Number(e.target.value) })} />
+          px/s
+        </label>
         <button style={styles.btn} onClick={save}>Save</button>
       </div>
     </section>
   );
 }
 
+function TrashSection<T extends { id: number }>({ type, items, labelFn, onReload }: { type: string; items: T[]; labelFn: (item: T) => string; onReload: () => void }) {
+  const [open, setOpen] = useState(false);
+
+  const restore = async (id: number) => {
+    await api.post(`/api/${type}/${id}/restore`);
+    onReload();
+  };
+
+  const purge = async (id: number) => {
+    await api.del(`/api/${type}/${id}/purge`);
+    onReload();
+  };
+
+  if (items.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: '12px' }}>
+      <button style={{ ...styles.smallBtn, background: '#555', marginLeft: 0 }} onClick={() => setOpen(!open)}>
+        {open ? '▾' : '▸'} Trash ({items.length})
+      </button>
+      {open && (
+        <ul style={styles.list}>
+          {items.map(item => (
+            <li key={item.id} style={{ ...styles.listItem, opacity: 0.6 }}>
+              <span>{labelFn(item)}</span>
+              <span>
+                <button style={{ ...styles.smallBtn, background: '#4caf50' }} onClick={() => restore(item.id)}>Restore</button>
+                <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => purge(item.id)}>Purge</button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function ServicesSection({ services, onSave }: { services: Service[]; onSave: () => void }) {
   const [name, setName] = useState('');
   const [status, setStatus] = useState('Operational');
+  const [trash, setTrash] = useState<Service[]>([]);
+
+  const loadTrash = useCallback(() => { api.get('/api/services/trash').then(setTrash); }, []);
+  useEffect(() => { loadTrash(); }, [loadTrash]);
+
+  const reload = () => { onSave(); loadTrash(); };
 
   const add = async () => {
     if (!name) return;
     await api.post('/api/services', { name, status, sortOrder: services.length });
     setName('');
-    onSave();
+    reload();
   };
 
   const remove = async (id: number) => {
     await api.del(`/api/services/${id}`);
-    onSave();
+    reload();
   };
 
   const toggle = async (s: Service) => {
@@ -108,13 +156,67 @@ function ServicesSection({ services, onSave }: { services: Service[]; onSave: ()
           </li>
         ))}
       </ul>
+      <TrashSection type="services" items={trash} labelFn={s => s.name} onReload={reload} />
     </section>
+  );
+}
+
+const IMAGE_PRESETS = [
+  { label: 'Yoga', url: '/images/yoga.jpg' },
+  { label: 'Bagels / Brunch', url: '/images/bagels.jpg' },
+  { label: 'Tequila / Drinks', url: '/images/tequila.jpg' },
+];
+
+function ImagePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const isPreset = IMAGE_PRESETS.some(p => p.url === value);
+  const isCustom = !!value && !isPreset;
+  const [showCustom, setShowCustom] = useState(isCustom);
+
+  const handleSelect = (v: string) => {
+    if (v === '__custom__') {
+      setShowCustom(true);
+      onChange('');
+    } else if (v === '') {
+      setShowCustom(false);
+      onChange('');
+    } else {
+      setShowCustom(false);
+      onChange(v);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
+      <select
+        style={styles.input}
+        value={showCustom ? '__custom__' : value}
+        onChange={e => handleSelect(e.target.value)}
+      >
+        <option value="">No image</option>
+        {IMAGE_PRESETS.map(p => <option key={p.url} value={p.url}>{p.label}</option>)}
+        <option value="__custom__">Custom URL...</option>
+      </select>
+      {showCustom && (
+        <input
+          style={{ ...styles.input, flex: 1 }}
+          placeholder="https://..."
+          value={value}
+          onChange={e => onChange(e.target.value)}
+        />
+      )}
+    </div>
   );
 }
 
 function EventsSection({ events, onSave }: { events: Event[]; onSave: () => void }) {
   const empty = { title: '', subtitle: '', details: '' as string, imageUrl: '', accentColor: '#00bcd4' };
   const [form, setForm] = useState(empty);
+  const [trash, setTrash] = useState<Event[]>([]);
+
+  const loadTrash = useCallback(() => { api.get('/api/events/trash').then(setTrash); }, []);
+  useEffect(() => { loadTrash(); }, [loadTrash]);
+
+  const reload = () => { onSave(); loadTrash(); };
 
   const add = async () => {
     if (!form.title) return;
@@ -127,12 +229,12 @@ function EventsSection({ events, onSave }: { events: Event[]; onSave: () => void
       sortOrder: events.length,
     });
     setForm(empty);
-    onSave();
+    reload();
   };
 
   const remove = async (id: number) => {
     await api.del(`/api/events/${id}`);
-    onSave();
+    reload();
   };
 
   return (
@@ -144,7 +246,7 @@ function EventsSection({ events, onSave }: { events: Event[]; onSave: () => void
           <input style={styles.input} placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
           <input style={{ ...styles.input, width: '80px' }} type="color" value={form.accentColor} onChange={e => setForm({ ...form, accentColor: e.target.value })} />
         </div>
-        <input style={styles.input} placeholder="Image URL (optional)" value={form.imageUrl} onChange={e => setForm({ ...form, imageUrl: e.target.value })} />
+        <ImagePicker value={form.imageUrl} onChange={imageUrl => setForm({ ...form, imageUrl })} />
         <textarea style={{ ...styles.input, height: '60px' }} placeholder="Details (one per line)" value={form.details} onChange={e => setForm({ ...form, details: e.target.value })} />
         <button style={styles.btn} onClick={add}>Add Event</button>
       </div>
@@ -156,6 +258,7 @@ function EventsSection({ events, onSave }: { events: Event[]; onSave: () => void
           </li>
         ))}
       </ul>
+      <TrashSection type="events" items={trash} labelFn={e => e.title} onReload={reload} />
     </section>
   );
 }
@@ -207,17 +310,23 @@ function LabelPicker({ value, onChange, style }: { value: string; onChange: (v: 
 
 function AdvisoriesSection({ advisories, onSave }: { advisories: Advisory[]; onSave: () => void }) {
   const [form, setForm] = useState({ label: 'RESIDENT ADVISORY', message: '' });
+  const [trash, setTrash] = useState<Advisory[]>([]);
+
+  const loadTrash = useCallback(() => { api.get('/api/advisories/trash').then(setTrash); }, []);
+  useEffect(() => { loadTrash(); }, [loadTrash]);
+
+  const reload = () => { onSave(); loadTrash(); };
 
   const add = async () => {
     if (!form.message) return;
     await api.post('/api/advisories', form);
     setForm({ label: 'RESIDENT ADVISORY', message: '' });
-    onSave();
+    reload();
   };
 
   const remove = async (id: number) => {
     await api.del(`/api/advisories/${id}`);
-    onSave();
+    reload();
   };
 
   const toggleActive = async (a: Advisory) => {
@@ -250,12 +359,13 @@ function AdvisoriesSection({ advisories, onSave }: { advisories: Advisory[]; onS
           </li>
         ))}
       </ul>
+      <TrashSection type="advisories" items={trash} labelFn={a => `${a.label}: ${a.message}`} onReload={reload} />
     </section>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { maxWidth: '900px', margin: '0 auto', padding: '24px', color: '#e0e0e0' },
+  page: { maxWidth: '900px', margin: '0 auto', padding: '24px', color: '#e0e0e0', background: '#0a1628', minHeight: '100vh' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #1a3050', paddingBottom: '16px' },
   link: { color: '#00bcd4', textDecoration: 'none' },
   section: { background: '#132038', borderRadius: '12px', border: '1px solid #1a3050', padding: '20px', marginBottom: '20px' },

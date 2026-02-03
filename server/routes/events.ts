@@ -5,7 +5,13 @@ import { broadcast } from '../sse.js';
 const router = Router();
 
 router.get('/', async (_req, res) => {
-  const events = await prisma.event.findMany({ orderBy: { sortOrder: 'asc' } });
+  const events = await prisma.event.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } });
+  const parsed = events.map(e => ({ ...e, details: JSON.parse(e.details) }));
+  res.json(parsed);
+});
+
+router.get('/trash', async (_req, res) => {
+  const events = await prisma.event.findMany({ where: { deletedAt: { not: null } }, orderBy: { sortOrder: 'asc' } });
   const parsed = events.map(e => ({ ...e, details: JSON.parse(e.details) }));
   res.json(parsed);
 });
@@ -32,6 +38,18 @@ router.put('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
+  await prisma.event.update({ where: { id: Number(req.params.id) }, data: { deletedAt: new Date() } });
+  res.json({ ok: true });
+  broadcast();
+});
+
+router.post('/:id/restore', async (req, res) => {
+  await prisma.event.update({ where: { id: Number(req.params.id) }, data: { deletedAt: null } });
+  res.json({ ok: true });
+  broadcast();
+});
+
+router.delete('/:id/purge', async (req, res) => {
   await prisma.event.delete({ where: { id: Number(req.params.id) } });
   res.json({ ok: true });
   broadcast();
