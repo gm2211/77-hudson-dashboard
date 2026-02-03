@@ -89,7 +89,7 @@ export default function Admin() {
   return (
     <div style={{ ...styles.pageWrap, ...pendingBgStyle }}>
       <div style={styles.page}>
-        <header style={styles.header}>
+        <header style={{ ...styles.header, position: 'sticky', top: 0, zIndex: 100, background: '#0a1628' }}>
           <div>
             <h1 style={{ margin: 0 }}>Hudson Dashboard — Admin</h1>
             {hasChanges && <span style={{ color: '#ffc107', fontSize: '13px' }}>● Unpublished changes</span>}
@@ -136,6 +136,18 @@ export default function Admin() {
         input[type="number"]::-webkit-outer-spin-button {
           opacity: 1;
           filter: invert(0.8);
+        }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20%, 60% { transform: translateX(-4px); }
+          40%, 80% { transform: translateX(4px); }
+        }
+        .shake {
+          animation: shake 0.4s ease-in-out;
+        }
+        .field-error {
+          border-color: #f44336 !important;
+          box-shadow: 0 0 0 1px #f44336;
         }
       `}</style>
     </div>
@@ -601,6 +613,8 @@ function EventsSection({ events, config, onSave, hasChanged }: { events: Event[]
   const [editingId, setEditingId] = useState<number | null>(null);
   const [previewEvent, setPreviewEvent] = useState<Event | null>(null);
   const [scrollSpeed, setScrollSpeed] = useState(config?.scrollSpeed ?? 30);
+  const [errors, setErrors] = useState<{ title?: boolean }>({});
+  const [shake, setShake] = useState(false);
   const { trash, reload, remove } = useTrash<Event>('/api/events', onSave);
 
   useEffect(() => {
@@ -614,7 +628,13 @@ function EventsSection({ events, config, onSave, hasChanged }: { events: Event[]
   };
 
   const submit = async () => {
-    if (!form.title) return;
+    if (!form.title.trim()) {
+      setErrors({ title: true });
+      setShake(true);
+      setTimeout(() => setShake(false), 400);
+      return;
+    }
+    setErrors({});
     const body = {
       title: form.title,
       subtitle: form.subtitle,
@@ -657,8 +677,20 @@ function EventsSection({ events, config, onSave, hasChanged }: { events: Event[]
         <span style={styles.formLabel}>{editingId ? 'Edit Event' : 'Add New Event'}</span>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <input style={{ ...styles.input, flex: 1 }} placeholder="Title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
-            <input style={{ ...styles.input, flex: 1 }} placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontSize: '10px', color: '#888' }}>Title <span style={{ color: '#f44336' }}>*</span></span>
+              <input
+                className={`${errors.title ? 'field-error' : ''} ${shake && errors.title ? 'shake' : ''}`}
+                style={{ ...styles.input, width: '100%' }}
+                placeholder="Title"
+                value={form.title}
+                onChange={e => { setForm({ ...form, title: e.target.value }); setErrors({}); }}
+              />
+            </div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontSize: '10px', color: '#888' }}>Subtitle</span>
+              <input style={{ ...styles.input, width: '100%' }} placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
+            </div>
           </div>
           <ImagePicker label="Image" value={form.imageUrl} onChange={imageUrl => setForm({ ...form, imageUrl })} />
           <MarkdownEditor
@@ -698,7 +730,7 @@ function EventsSection({ events, config, onSave, hasChanged }: { events: Event[]
               </div>
             </div>
             <span style={{ display: 'flex', gap: '4px' }}>
-              <button style={{ ...styles.smallBtn, background: '#00838f' }} onClick={() => setPreviewEvent(e)} title="Preview">👁</button>
+              <button style={{ ...styles.smallBtn, background: '#00838f', fontSize: '10px' }} onClick={() => setPreviewEvent(e)}>Preview</button>
               <button style={{ ...styles.smallBtn, background: '#1976d2' }} onClick={() => startEdit(e)} title="Edit">✎</button>
               <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => remove(e.id)} title="Delete">✕</button>
             </span>
