@@ -25,12 +25,28 @@ function useTrash<T>(endpoint: string, onSave: () => void) {
   return { trash, reload, remove };
 }
 
+type SectionChanges = {
+  config: boolean;
+  services: boolean;
+  events: boolean;
+  advisories: boolean;
+};
+
+type PublishedData = {
+  services: Service[];
+  events: Event[];
+  advisories: Advisory[];
+  config: BuildingConfig | null;
+} | null;
+
 export default function Admin() {
   const [services, setServices] = useState<Service[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [advisories, setAdvisories] = useState<Advisory[]>([]);
   const [config, setConfig] = useState<BuildingConfig | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [sectionChanges, setSectionChanges] = useState<SectionChanges>({ config: false, services: false, events: false, advisories: false });
+  const [published, setPublished] = useState<PublishedData>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const load = useCallback(() => {
@@ -41,7 +57,11 @@ export default function Admin() {
   }, []);
 
   const checkDraft = useCallback(() => {
-    api.get('/api/draft-status').then(d => setHasChanges(d.hasChanges));
+    api.get('/api/draft-status').then(d => {
+      setHasChanges(d.hasChanges);
+      setSectionChanges(d.sectionChanges || { config: false, services: false, events: false, advisories: false });
+      setPublished(d.published || null);
+    });
   }, []);
 
   const onSave = useCallback(() => {
@@ -63,7 +83,7 @@ export default function Admin() {
   };
 
   return (
-    <div style={styles.pageWrap}>
+    <div style={{ ...styles.pageWrap, ...(hasChanges ? { background: '#0f1a28' } : {}) }}>
       <div style={styles.page}>
         <header style={styles.header}>
           <div>
@@ -71,17 +91,24 @@ export default function Admin() {
             {hasChanges && <span style={{ color: '#ffc107', fontSize: '13px' }}>● Unpublished changes</span>}
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <button style={styles.headerBtn} onClick={publish}>Publish</button>
+            <button
+              style={{
+                ...styles.headerBtn,
+                ...(hasChanges ? {} : { opacity: 0.5, cursor: 'not-allowed' }),
+              }}
+              onClick={hasChanges ? publish : undefined}
+              disabled={!hasChanges}
+            >Publish</button>
             <button style={{ ...styles.headerBtn, ...styles.headerBtnSecondary }} onClick={discard}>Discard</button>
             <button style={{ ...styles.headerBtn, ...styles.headerBtnSecondary }} onClick={() => setPreviewOpen(true)}>Preview</button>
             <a href="/" style={styles.link}>← Dashboard</a>
           </div>
         </header>
 
-        <ConfigSection config={config} onSave={onSave} />
-        <ServicesSection services={services} onSave={onSave} />
-        <EventsSection events={events} config={config} onSave={onSave} />
-        <AdvisoriesSection advisories={advisories} config={config} onSave={onSave} />
+        <ConfigSection config={config} onSave={onSave} hasChanged={sectionChanges.config} />
+        <ServicesSection services={services} onSave={onSave} hasChanged={sectionChanges.services} publishedServices={published?.services || null} />
+        <EventsSection events={events} config={config} onSave={onSave} hasChanged={sectionChanges.events} />
+        <AdvisoriesSection advisories={advisories} config={config} onSave={onSave} hasChanged={sectionChanges.advisories} />
       </div>
 
       {previewOpen && (
@@ -121,7 +148,7 @@ function StatusSelect({ value, onChange, style }: { value: string; onChange: (v:
   );
 }
 
-function ConfigSection({ config, onSave }: { config: BuildingConfig | null; onSave: () => void }) {
+function ConfigSection({ config, onSave, hasChanged }: { config: BuildingConfig | null; onSave: () => void; hasChanged: boolean }) {
   const [form, setForm] = useState({ buildingNumber: '', buildingName: '', subtitle: '' });
 
   useEffect(() => {
@@ -134,13 +161,16 @@ function ConfigSection({ config, onSave }: { config: BuildingConfig | null; onSa
   };
 
   return (
-    <section style={styles.section}>
-      <h2 style={styles.sectionTitle}>Building Config</h2>
+    <section style={{ ...styles.section, ...(hasChanged ? styles.sectionChanged : {}) }}>
+      <h2 style={styles.sectionTitle}>
+        Building Config
+        {hasChanged && <span style={styles.changeIndicator}>●</span>}
+      </h2>
       <div style={styles.row}>
         <input style={styles.input} placeholder="Building #" value={form.buildingNumber} onChange={e => setForm({ ...form, buildingNumber: e.target.value })} />
         <input style={styles.input} placeholder="Building Name" value={form.buildingName} onChange={e => setForm({ ...form, buildingName: e.target.value })} />
         <input style={styles.input} placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
-        <button style={styles.btn} onClick={save}>Save</button>
+        <button style={styles.btn} onClick={save}>Save Draft</button>
       </div>
     </section>
   );
@@ -187,7 +217,7 @@ function TrashSection<T extends { id: number }>({ type, items, labelFn, onReload
   );
 }
 
-function ServicesSection({ services, onSave }: { services: Service[]; onSave: () => void }) {
+function ServicesSection({ services, onSave, hasChanged, publishedServices }: { services: Service[]; onSave: () => void; hasChanged: boolean; publishedServices: Service[] | null }) {
   const [name, setName] = useState('');
   const [status, setStatus] = useState('Operational');
   const { trash, reload, remove } = useTrash<Service>('/api/services', onSave);
@@ -214,28 +244,49 @@ function ServicesSection({ services, onSave }: { services: Service[]; onSave: ()
     return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   };
 
+  const getPublishedService = (id: number): Service | undefined => {
+    return publishedServices?.find(ps => ps.id === id);
+  };
+
   return (
-    <section style={styles.section}>
-      <h2 style={styles.sectionTitle}>Services</h2>
+    <section style={{ ...styles.section, ...(hasChanged ? styles.sectionChanged : {}) }}>
+      <h2 style={styles.sectionTitle}>
+        Services
+        {hasChanged && <span style={styles.changeIndicator}>●</span>}
+      </h2>
       <div style={styles.row}>
         <input style={styles.input} placeholder="Service name" value={name} onChange={e => setName(e.target.value)} />
         <StatusSelect value={status} onChange={setStatus} />
-        <button style={styles.btn} onClick={add}>Add</button>
+        <button style={styles.btn} onClick={add}>Add Service to Draft</button>
       </div>
       <ul style={styles.list}>
-        {services.map(s => (
-          <li key={s.id} style={styles.listItem}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span>{s.name}</span>
-              <span style={{ fontSize: '11px', color: '#888' }}>Last: {formatLastChecked(s.lastChecked)}</span>
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button style={{ ...styles.smallBtn, background: '#555', fontSize: '10px' }} onClick={() => setLastCheckedNow(s)} title="Set last checked to now">⏱ Now</button>
-              <StatusSelect value={s.status} onChange={v => changeStatus(s, v)} style={{ padding: '4px 8px', fontSize: '12px' }} />
-              <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => remove(s.id)}>✕</button>
-            </span>
-          </li>
-        ))}
+        {services.map(s => {
+          const pub = getPublishedService(s.id);
+          const statusChanged = pub && pub.status !== s.status;
+          const timeChanged = pub && pub.lastChecked !== s.lastChecked;
+
+          return (
+            <li key={s.id} style={styles.listItem}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span>{s.name}</span>
+                <span style={{ fontSize: '11px', color: '#888' }}>
+                  Last: {formatLastChecked(s.lastChecked)}
+                  {timeChanged && (
+                    <span style={styles.changedValue}> was {formatLastChecked(pub.lastChecked)}</span>
+                  )}
+                </span>
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button style={{ ...styles.smallBtn, background: '#555', fontSize: '10px' }} onClick={() => setLastCheckedNow(s)} title="Mark as just checked">Just Checked</button>
+                {statusChanged && (
+                  <span style={styles.changedValue}>{pub.status} →</span>
+                )}
+                <StatusSelect value={s.status} onChange={v => changeStatus(s, v)} style={{ padding: '4px 8px', fontSize: '12px' }} />
+                <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => remove(s.id)}>✕</button>
+              </span>
+            </li>
+          );
+        })}
       </ul>
       <TrashSection type="services" items={trash} labelFn={s => s.name} onReload={reload} />
     </section>
@@ -248,7 +299,7 @@ const IMAGE_PRESETS = [
   { label: 'Tequila / Drinks', url: '/images/tequila.jpg' },
 ];
 
-function ImagePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function ImagePicker({ value, onChange, label }: { value: string; onChange: (v: string) => void; label?: string }) {
   const isPreset = IMAGE_PRESETS.some(p => p.url === value);
   const isCustom = !!value && !isPreset;
   const [showCustom, setShowCustom] = useState(isCustom);
@@ -278,45 +329,209 @@ function ImagePicker({ value, onChange }: { value: string; onChange: (v: string)
   };
 
   return (
-    <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
-      <select
-        style={styles.input}
-        value={showCustom ? '__custom__' : value}
-        onChange={e => handleSelect(e.target.value)}
-      >
-        <option value="">No image</option>
-        {IMAGE_PRESETS.map(p => <option key={p.url} value={p.url}>{p.label}</option>)}
-        <option value="__custom__">Custom URL...</option>
-      </select>
-      {showCustom && (
-        <>
-          <input
-            style={{ ...styles.input, flex: 1 }}
-            placeholder="https://..."
-            value={value}
-            onChange={e => onChange(e.target.value)}
-          />
-          <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleUpload} />
-          <button style={styles.smallBtn} onClick={() => fileRef.current?.click()}>Upload</button>
-        </>
-      )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      {label && <span style={{ fontSize: '12px', color: '#888' }}>{label}</span>}
+      <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
+        <select
+          style={styles.input}
+          value={showCustom ? '__custom__' : value}
+          onChange={e => handleSelect(e.target.value)}
+        >
+          <option value="">No image</option>
+          {IMAGE_PRESETS.map(p => <option key={p.url} value={p.url}>{p.label}</option>)}
+          <option value="__custom__">Custom URL...</option>
+        </select>
+        {showCustom && (
+          <>
+            <input
+              style={{ ...styles.input, flex: 1 }}
+              placeholder="https://..."
+              value={value}
+              onChange={e => onChange(e.target.value)}
+            />
+            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleUpload} />
+            <button style={styles.smallBtn} onClick={() => fileRef.current?.click()}>Upload</button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
 function parseMarkdown(md: string): string {
-  return md
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/`(.+?)`/g, '<code>$1</code>')
-    .replace(/\n/g, '<br/>');
+  const lines = md.split('\n');
+  const result: string[] = [];
+  let inBulletList = false;
+  let inNumberedList = false;
+
+  for (const line of lines) {
+    let processed = line;
+
+    // Check for list items
+    const bulletMatch = processed.match(/^[-*]\s+(.*)$/);
+    const numberedMatch = processed.match(/^\d+\.\s+(.*)$/);
+
+    if (bulletMatch) {
+      if (!inBulletList) {
+        if (inNumberedList) { result.push('</ol>'); inNumberedList = false; }
+        result.push('<ul>');
+        inBulletList = true;
+      }
+      processed = `<li>${bulletMatch[1]}</li>`;
+    } else if (numberedMatch) {
+      if (!inNumberedList) {
+        if (inBulletList) { result.push('</ul>'); inBulletList = false; }
+        result.push('<ol>');
+        inNumberedList = true;
+      }
+      processed = `<li>${numberedMatch[1]}</li>`;
+    } else {
+      // Close any open lists
+      if (inBulletList) { result.push('</ul>'); inBulletList = false; }
+      if (inNumberedList) { result.push('</ol>'); inNumberedList = false; }
+
+      // Headers
+      if (processed.match(/^### (.+)$/)) {
+        processed = processed.replace(/^### (.+)$/, '<h3>$1</h3>');
+      } else if (processed.match(/^## (.+)$/)) {
+        processed = processed.replace(/^## (.+)$/, '<h2>$1</h2>');
+      } else if (processed.match(/^# (.+)$/)) {
+        processed = processed.replace(/^# (.+)$/, '<h1>$1</h1>');
+      } else if (processed.trim() === '') {
+        processed = '<br/>';
+      } else {
+        processed = processed + '<br/>';
+      }
+    }
+
+    // Inline formatting (apply to all lines)
+    processed = processed
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.+?)__/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/_(.+?)_/g, '<em>$1</em>')
+      .replace(/~~(.+?)~~/g, '<del>$1</del>')
+      .replace(/`(.+?)`/g, '<code style="background:#1a3050;padding:2px 4px;border-radius:3px">$1</code>');
+
+    result.push(processed);
+  }
+
+  // Close any remaining open lists
+  if (inBulletList) result.push('</ul>');
+  if (inNumberedList) result.push('</ol>');
+
+  return result.join('');
 }
 
-function MarkdownEditor({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+type CardPreviewData = {
+  title: string;
+  subtitle: string;
+  imageUrl: string;
+};
+
+function EventCardPreview({ title, subtitle, imageUrl, details }: CardPreviewData & { details: string }) {
+  const detailLines = details.split('\n').filter(Boolean);
+
+  // Match actual EventCard component styling
+  const cardStyle: React.CSSProperties = {
+    background: 'linear-gradient(135deg, #1a5c5a 0%, #1a4a48 100%)',
+    borderRadius: '12px',
+    overflow: 'hidden',
+    border: '1px solid rgba(255,255,255,0.1)',
+    display: 'flex',
+    flexDirection: 'column',
+    maxWidth: '320px',
+    ...(imageUrl ? {
+      backgroundImage: `linear-gradient(to right, rgba(20,60,58,0.92) 0%, rgba(20,60,58,0.75) 50%, rgba(20,60,58,0.3) 100%), url(${imageUrl})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    } : {}),
+  };
+
+  return (
+    <div style={cardStyle}>
+      <div style={{ padding: '24px 28px' }}>
+        <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#fff', margin: '0 0 4px' }}>
+          {title || <span style={{ color: '#666', fontWeight: 400 }}>No title</span>}
+        </h3>
+        {(subtitle || !title) && (
+          <p style={{ fontSize: '14px', color: '#b0d4d0', margin: '0 0 14px', fontStyle: 'italic' }}>
+            {subtitle || <span style={{ color: '#557' }}>No subtitle</span>}
+          </p>
+        )}
+        {detailLines.length > 0 ? (
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {detailLines.map((line, i) => (
+              <li key={i} style={{ fontSize: '14px', color: '#e0e0e0', marginBottom: '4px', display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                <span style={{ color: '#e0e0e0', fontSize: '8px', flexShrink: 0 }}>●</span>
+                <span dangerouslySetInnerHTML={{ __html: parseMarkdown(line).replace(/<br\/>$/g, '') }} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p style={{ margin: 0, color: '#557', fontSize: '13px', fontStyle: 'italic' }}>No details yet</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MarkdownEditor({ value, onChange, placeholder, cardPreview }: { value: string; onChange: (v: string) => void; placeholder?: string; cardPreview?: CardPreviewData }) {
   const [showPreview, setShowPreview] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const insertMarkdown = (prefix: string, suffix: string = prefix) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = value;
+    const selectedText = text.substring(start, end);
+
+    const newText = text.substring(0, start) + prefix + selectedText + suffix + text.substring(end);
+    onChange(newText);
+
+    // Restore cursor position after the inserted text
+    setTimeout(() => {
+      textarea.focus();
+      const newPos = selectedText ? start + prefix.length + selectedText.length + suffix.length : start + prefix.length;
+      textarea.setSelectionRange(newPos, newPos);
+    }, 0);
+  };
+
+  const insertLinePrefix = (prefix: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const text = value;
+
+    // Find the start of the current line
+    let lineStart = start;
+    while (lineStart > 0 && text[lineStart - 1] !== '\n') {
+      lineStart--;
+    }
+
+    const newText = text.substring(0, lineStart) + prefix + text.substring(lineStart);
+    onChange(newText);
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + prefix.length, start + prefix.length);
+    }, 0);
+  };
+
+  const toolbarBtnStyle: React.CSSProperties = {
+    background: '#1a3050',
+    border: '1px solid #2a4060',
+    borderRadius: '4px',
+    padding: '4px 8px',
+    color: '#e0e0e0',
+    cursor: 'pointer',
+    fontSize: '12px',
+    minWidth: '28px',
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -327,18 +542,32 @@ function MarkdownEditor({ value, onChange, placeholder }: { value: string; onCha
           style={{ ...styles.smallBtn, background: showPreview ? '#00838f' : '#555', marginLeft: 'auto' }}
           onClick={() => setShowPreview(!showPreview)}
         >
-          {showPreview ? 'Edit' : 'Preview'}
+          {showPreview ? 'Edit' : (cardPreview ? 'Preview Card' : 'Preview')}
         </button>
       </div>
+      {!showPreview && (
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+          <button type="button" style={{ ...toolbarBtnStyle, fontWeight: 'bold' }} onClick={() => insertMarkdown('**')} title="Bold">B</button>
+          <button type="button" style={{ ...toolbarBtnStyle, fontStyle: 'italic' }} onClick={() => insertMarkdown('*')} title="Italic">I</button>
+          <button type="button" style={{ ...toolbarBtnStyle, textDecoration: 'line-through' }} onClick={() => insertMarkdown('~~')} title="Strikethrough">S</button>
+          <button type="button" style={toolbarBtnStyle} onClick={() => insertLinePrefix('- ')} title="Bullet list">•</button>
+          <button type="button" style={toolbarBtnStyle} onClick={() => insertLinePrefix('1. ')} title="Numbered list">1.</button>
+        </div>
+      )}
       {showPreview ? (
-        <div
-          style={{ ...styles.input, minHeight: '100px', padding: '12px', lineHeight: 1.5, overflow: 'auto' }}
-          dangerouslySetInnerHTML={{ __html: parseMarkdown(value) || '<span style="color:#666">Nothing to preview</span>' }}
-        />
+        cardPreview ? (
+          <EventCardPreview {...cardPreview} details={value} />
+        ) : (
+          <div
+            style={{ ...styles.input, minHeight: '100px', padding: '12px', lineHeight: 1.5, overflow: 'auto' }}
+            dangerouslySetInnerHTML={{ __html: parseMarkdown(value) || '<span style="color:#666">Nothing to preview</span>' }}
+          />
+        )
       ) : (
         <textarea
+          ref={textareaRef}
           style={{ ...styles.input, height: '100px', fontFamily: 'monospace', fontSize: '13px' }}
-          placeholder={placeholder || "**Bold**, *italic*, `code`\nEach line becomes a detail bullet"}
+          placeholder={placeholder || "**Bold**, *italic*, ~~strikethrough~~, `code`\n- Bullet list\n1. Numbered list"}
           value={value}
           onChange={e => onChange(e.target.value)}
         />
@@ -347,7 +576,7 @@ function MarkdownEditor({ value, onChange, placeholder }: { value: string; onCha
   );
 }
 
-function EventsSection({ events, config, onSave }: { events: Event[]; config: BuildingConfig | null; onSave: () => void }) {
+function EventsSection({ events, config, onSave, hasChanged }: { events: Event[]; config: BuildingConfig | null; onSave: () => void; hasChanged: boolean }) {
   const empty = { title: '', subtitle: '', details: '' as string, imageUrl: '' };
   const [form, setForm] = useState(empty);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -399,17 +628,25 @@ function EventsSection({ events, config, onSave }: { events: Event[]; config: Bu
   };
 
   return (
-    <section style={styles.section}>
-      <h2 style={styles.sectionTitle}>Events</h2>
+    <section style={{ ...styles.section, ...(hasChanged ? styles.sectionChanged : {}) }}>
+      <h2 style={styles.sectionTitle}>
+        Events
+        {hasChanged && <span style={styles.changeIndicator}>●</span>}
+      </h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
         <div style={styles.row}>
           <input style={{ ...styles.input, flex: 1 }} placeholder="Title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
           <input style={{ ...styles.input, flex: 1 }} placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
         </div>
-        <ImagePicker value={form.imageUrl} onChange={imageUrl => setForm({ ...form, imageUrl })} />
-        <MarkdownEditor key={editingId ?? 'new'} value={form.details} onChange={details => setForm({ ...form, details })} />
+        <ImagePicker label="Image" value={form.imageUrl} onChange={imageUrl => setForm({ ...form, imageUrl })} />
+        <MarkdownEditor
+          key={editingId ?? 'new'}
+          value={form.details}
+          onChange={details => setForm({ ...form, details })}
+          cardPreview={{ title: form.title, subtitle: form.subtitle, imageUrl: form.imageUrl }}
+        />
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button style={styles.btn} onClick={submit}>{editingId ? 'Save' : 'Add Event'}</button>
+          <button style={styles.btn} onClick={submit}>{editingId ? 'Save Draft' : 'Add Event to Draft'}</button>
           {editingId && <button style={{ ...styles.btn, background: '#555' }} onClick={cancelEdit}>Cancel</button>}
         </div>
       </div>
@@ -426,7 +663,7 @@ function EventsSection({ events, config, onSave }: { events: Event[]; config: Bu
       </ul>
       <TrashSection type="events" items={trash} labelFn={e => e.title} onReload={reload} />
 
-      <div style={{ marginTop: '16px', borderTop: '1px solid #1a3050', paddingTop: '12px' }}>
+      <div style={{ marginTop: '16px', paddingTop: '12px', ...(trash.length === 0 ? { borderTop: '1px solid #1a3050' } : {}) }}>
         <label style={{ color: '#e0e0e0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           Scroll speed
           <input style={{ ...styles.input, width: '70px' }} type="number" min="0" max="200" value={scrollSpeed} onChange={e => saveScrollSpeed(Number(e.target.value))} />
@@ -479,7 +716,7 @@ function LabelPicker({ value, onChange, style }: { value: string; onChange: (v: 
   );
 }
 
-function AdvisoriesSection({ advisories, config, onSave }: { advisories: Advisory[]; config: BuildingConfig | null; onSave: () => void }) {
+function AdvisoriesSection({ advisories, config, onSave, hasChanged }: { advisories: Advisory[]; config: BuildingConfig | null; onSave: () => void; hasChanged: boolean }) {
   const [form, setForm] = useState({ label: ADVISORY_PRESETS[0], message: '' });
   const [tickerSpeed, setTickerSpeed] = useState(config?.tickerSpeed ?? 25);
   const { trash, reload, remove } = useTrash<Advisory>('/api/advisories', onSave);
@@ -512,12 +749,15 @@ function AdvisoriesSection({ advisories, config, onSave }: { advisories: Advisor
   };
 
   return (
-    <section style={styles.section}>
-      <h2 style={styles.sectionTitle}>Advisories</h2>
+    <section style={{ ...styles.section, ...(hasChanged ? styles.sectionChanged : {}) }}>
+      <h2 style={styles.sectionTitle}>
+        Advisories
+        {hasChanged && <span style={styles.changeIndicator}>●</span>}
+      </h2>
       <div style={styles.row}>
         <LabelPicker style={{ width: '200px' }} value={form.label} onChange={label => setForm({ ...form, label })} />
         <input style={{ ...styles.input, flex: 1 }} placeholder="Message" value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} />
-        <button style={styles.btn} onClick={add}>Add</button>
+        <button style={styles.btn} onClick={add}>Add Advisory to Draft</button>
       </div>
       <ul style={styles.list}>
         {advisories.map(a => (
@@ -533,7 +773,7 @@ function AdvisoriesSection({ advisories, config, onSave }: { advisories: Advisor
       </ul>
       <TrashSection type="advisories" items={trash} labelFn={a => `${a.label}: ${a.message}`} onReload={reload} />
 
-      <div style={{ marginTop: '16px', borderTop: '1px solid #1a3050', paddingTop: '12px' }}>
+      <div style={{ marginTop: '16px', paddingTop: '12px', ...(trash.length === 0 ? { borderTop: '1px solid #1a3050' } : {}) }}>
         <label style={{ color: '#e0e0e0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           Ticker scroll duration
           <input style={{ ...styles.input, width: '70px' }} type="number" min="0" max="120" value={tickerSpeed} onChange={e => saveTickerSpeed(Number(e.target.value))} />
@@ -550,7 +790,15 @@ const styles: Record<string, React.CSSProperties> = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #1a3050', paddingBottom: '16px' },
   link: { color: '#00bcd4', textDecoration: 'none', fontSize: '14px' },
   section: { background: '#132038', borderRadius: '12px', border: '1px solid #1a3050', padding: '20px', marginBottom: '20px' },
-  sectionTitle: { margin: '0 0 12px' },
+  sectionChanged: { borderLeft: '3px solid #ffc107' },
+  sectionTitle: { margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: '8px' },
+  changeIndicator: { color: '#ffc107', fontSize: '12px' },
+  changedValue: {
+    color: '#ffc107',
+    fontSize: '10px',
+    opacity: 0.7,
+    marginLeft: '4px',
+  },
   row: { display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' },
   input: { background: '#0a1628', border: '1px solid #1a3050', borderRadius: '6px', padding: '8px 12px', color: '#e0e0e0', fontSize: '14px' },
   btn: { background: '#00838f', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 16px', cursor: 'pointer', fontWeight: 600 },

@@ -90,13 +90,33 @@ router.post('/discard', async (_req, res) => {
 
 router.get('/draft-status', async (_req, res) => {
   const snapshot = await prisma.publishedSnapshot.findFirst({ orderBy: { publishedAt: 'desc' } });
-  if (!snapshot) return res.json({ hasChanges: true });
+  if (!snapshot) return res.json({ hasChanges: true, sectionChanges: { config: true, services: true, events: true, advisories: true }, published: null });
 
   const current = await getCurrentState();
   const published = JSON.parse(snapshot.data);
 
-  const hasChanges = JSON.stringify(current) !== JSON.stringify(published);
-  res.json({ hasChanges });
+  // Compare only the editable fields for config to avoid false positives from metadata fields
+  const configChanged = (() => {
+    if (!current.config && !published.config) return false;
+    if (!current.config || !published.config) return true;
+    return (
+      current.config.buildingNumber !== published.config.buildingNumber ||
+      current.config.buildingName !== published.config.buildingName ||
+      current.config.subtitle !== published.config.subtitle ||
+      current.config.scrollSpeed !== published.config.scrollSpeed ||
+      current.config.tickerSpeed !== published.config.tickerSpeed
+    );
+  })();
+
+  const sectionChanges = {
+    config: configChanged,
+    services: JSON.stringify(current.services) !== JSON.stringify(published.services),
+    events: JSON.stringify(current.events) !== JSON.stringify(published.events),
+    advisories: JSON.stringify(current.advisories) !== JSON.stringify(published.advisories),
+  };
+
+  const hasChanges = Object.values(sectionChanges).some(Boolean);
+  res.json({ hasChanges, sectionChanges, published });
 });
 
 export default router;
