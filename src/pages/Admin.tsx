@@ -293,7 +293,7 @@ function ServicesSection({ services, onSave, hasChanged, publishedServices }: { 
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <button style={{ ...styles.smallBtn, background: '#555', fontSize: '10px' }} onClick={() => setLastCheckedNow(s)} title="Mark as just checked">Just Checked</button>
                 {statusChanged && (
-                  <span style={styles.changedValue}>{pub.status} →</span>
+                  <span style={{ fontSize: '10px', opacity: 0.8, color: STATUS_COLORS[pub.status] }}>{pub.status} →</span>
                 )}
                 <StatusSelect value={s.status} onChange={v => changeStatus(s, v)} style={{ padding: '4px 8px', fontSize: '12px' }} />
                 <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => remove(s.id)}>✕</button>
@@ -599,6 +599,7 @@ function EventsSection({ events, config, onSave, hasChanged }: { events: Event[]
   const empty = { title: '', subtitle: '', details: '' as string, imageUrl: '' };
   const [form, setForm] = useState(empty);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [previewEvent, setPreviewEvent] = useState<Event | null>(null);
   const [scrollSpeed, setScrollSpeed] = useState(config?.scrollSpeed ?? 30);
   const { trash, reload, remove } = useTrash<Event>('/api/events', onSave);
 
@@ -675,17 +676,52 @@ function EventsSection({ events, config, onSave, hasChanged }: { events: Event[]
       <div>
         {events.map(e => (
           <div key={e.id} style={styles.listCard}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ fontWeight: 600, color: '#fff' }}>{e.title}</span>
-              <span style={{ fontSize: '12px', color: '#888' }}>{e.subtitle}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+              {e.imageUrl && (
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '6px',
+                  backgroundImage: `url(${e.imageUrl})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  flexShrink: 0,
+                }} />
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                <span style={{ fontWeight: 600, color: '#fff' }}>{e.title}</span>
+                <span style={{ fontSize: '12px', color: '#888' }}>{e.subtitle}</span>
+                <span style={{ fontSize: '10px', color: '#666' }}>
+                  {e.details.length} detail{e.details.length !== 1 ? 's' : ''}
+                  {e.imageUrl && ' • has image'}
+                </span>
+              </div>
             </div>
             <span style={{ display: 'flex', gap: '4px' }}>
-              <button style={{ ...styles.smallBtn, background: '#1976d2' }} onClick={() => startEdit(e)}>✎</button>
-              <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => remove(e.id)}>✕</button>
+              <button style={{ ...styles.smallBtn, background: '#00838f' }} onClick={() => setPreviewEvent(e)} title="Preview">👁</button>
+              <button style={{ ...styles.smallBtn, background: '#1976d2' }} onClick={() => startEdit(e)} title="Edit">✎</button>
+              <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => remove(e.id)} title="Delete">✕</button>
             </span>
           </div>
         ))}
       </div>
+
+      {previewEvent && (
+        <div style={styles.modalOverlay} onClick={() => setPreviewEvent(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ position: 'relative' }}>
+            <EventCardPreview
+              title={previewEvent.title}
+              subtitle={previewEvent.subtitle}
+              imageUrl={previewEvent.imageUrl}
+              details={previewEvent.details.join('\n')}
+            />
+            <button
+              style={{ ...styles.smallBtn, position: 'absolute', top: '-8px', right: '-8px', background: '#555' }}
+              onClick={() => setPreviewEvent(null)}
+            >✕</button>
+          </div>
+        </div>
+      )}
       <TrashSection type="events" items={trash} labelFn={e => e.title} onReload={reload} />
 
       <div style={{ marginTop: '12px' }}>
