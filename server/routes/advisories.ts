@@ -1,10 +1,7 @@
 import { Router } from 'express';
 import prisma from '../db.js';
-import { addSoftDeleteRoutes } from './softDelete.js';
 
 const router = Router();
-
-addSoftDeleteRoutes(router, prisma.advisory);
 
 router.get('/', async (_req, res) => {
   const advisories = await prisma.advisory.findMany({ where: { deletedAt: null } });

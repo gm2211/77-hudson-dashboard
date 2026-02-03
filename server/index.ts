@@ -8,7 +8,7 @@ import servicesRouter from './routes/services.js';
 import eventsRouter from './routes/events.js';
 import advisoriesRouter from './routes/advisories.js';
 import configRouter from './routes/config.js';
-import publishRouter from './routes/publish.js';
+import snapshotsRouter from './routes/snapshots.js';
 import prisma from './db.js';
 import { sseHandler } from './sse.js';
 
@@ -37,7 +37,7 @@ app.use('/api/services', servicesRouter);
 app.use('/api/events', eventsRouter);
 app.use('/api/advisories', advisoriesRouter);
 app.use('/api/config', configRouter);
-app.use('/api', publishRouter);
+app.use('/api/snapshots', snapshotsRouter);
 
 app.post('/api/upload', upload.single('file'), (req: any, res: any) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -125,7 +125,7 @@ async function seedSnapshot() {
     advisories,
     config,
   };
-  await prisma.publishedSnapshot.create({ data: { data: JSON.stringify(data) } });
+  await prisma.publishedSnapshot.create({ data: { version: 1, data: JSON.stringify(data) } });
 }
 
 async function start() {

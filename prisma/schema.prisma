@@ -50,6 +50,7 @@ model BuildingConfig {
 
 model PublishedSnapshot {
   id          Int      @id @default(autoincrement())
+  version     Int      @unique
   data        String
   publishedAt DateTime @default(now())
 }

@@ -11,7 +11,9 @@ export default function Dashboard() {
   const [advisories, setAdvisories] = useState<Advisory[]>([]);
   const [config, setConfig] = useState<BuildingConfig | null>(null);
 
-  const isPreview = new URLSearchParams(window.location.search).get('preview') === 'true';
+  const params = new URLSearchParams(window.location.search);
+  const isPreview = params.get('preview') === 'true';
+  const snapshotVersion = params.get('snapshot');
 
   const fetchAll = useCallback(() => {
     if (isPreview) {
@@ -19,15 +21,23 @@ export default function Dashboard() {
       fetch('/api/events').then(r => r.json()).then(setEvents);
       fetch('/api/advisories').then(r => r.json()).then(setAdvisories);
       fetch('/api/config').then(r => r.json()).then(setConfig);
+    } else if (snapshotVersion) {
+      // Load a specific snapshot version (for preview in history)
+      fetch(`/api/snapshots/${snapshotVersion}`).then(r => r.json()).then(data => {
+        setServices(data.services || []);
+        setEvents(data.events || []);
+        setAdvisories(data.advisories || []);
+        setConfig(data.config || null);
+      });
     } else {
-      fetch('/api/published').then(r => r.json()).then(data => {
+      fetch('/api/snapshots/latest').then(r => r.json()).then(data => {
         setServices(data.services || []);
         setEvents(data.events || []);
         setAdvisories(data.advisories || []);
         setConfig(data.config || null);
       });
     }
-  }, [isPreview]);
+  }, [isPreview, snapshotVersion]);
 
   useEffect(() => {
     fetchAll();
@@ -49,7 +59,7 @@ export default function Dashboard() {
       </div>
       <AdvisoryTicker advisories={advisories} tickerSpeed={tickerSpeed} />
       <style>{`
-        html, body { overflow: hidden; height: 100%; }
+        html, body { overflow: hidden; height: 100%; background: #fff; }
         #root { height: 100%; }
       `}</style>
     </div>

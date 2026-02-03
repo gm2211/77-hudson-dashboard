@@ -1,12 +1,9 @@
 import { Router } from 'express';
 import prisma from '../db.js';
-import { addSoftDeleteRoutes } from './softDelete.js';
 
 const router = Router();
 
 const parseEventDetails = (e: any) => ({ ...e, details: JSON.parse(e.details) });
-
-addSoftDeleteRoutes(router, prisma.event, parseEventDetails);
 
 router.get('/', async (_req, res) => {
   const events = await prisma.event.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } });

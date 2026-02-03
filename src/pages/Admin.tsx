@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Service, Event, Advisory, BuildingConfig } from '../types';
 import { api } from '../utils/api';
 import { parseMarkdown } from '../utils/markdown';
-import { useTrash } from '../hooks/useTrash';
+import { SnapshotHistory } from '../components/admin/SnapshotHistory';
 import { STATUS_COLORS, ADVISORY_PRESETS, IMAGE_PRESETS, CONFIG } from '../constants';
 
 type SectionChanges = {
@@ -28,6 +28,7 @@ export default function Admin() {
   const [sectionChanges, setSectionChanges] = useState<SectionChanges>({ config: false, services: false, events: false, advisories: false });
   const [published, setPublished] = useState<PublishedData>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const load = useCallback(() => {
     api.get('/api/services').then(setServices);
@@ -37,7 +38,7 @@ export default function Admin() {
   }, []);
 
   const checkDraft = useCallback(() => {
-    api.get('/api/draft-status').then(d => {
+    api.get('/api/snapshots/draft-status').then(d => {
       setHasChanges(d.hasChanges);
       setSectionChanges(d.sectionChanges || { config: false, services: false, events: false, advisories: false });
       setPublished(d.published || null);
@@ -49,16 +50,21 @@ export default function Admin() {
     checkDraft();
   }, [load, checkDraft]);
 
+  // Lighter callback for config changes - doesn't reload config
+  const onConfigSave = useCallback(() => {
+    checkDraft();
+  }, [checkDraft]);
+
   useEffect(() => { load(); checkDraft(); }, [load, checkDraft]);
 
   const publish = async () => {
-    await api.post('/api/publish');
+    await api.post('/api/snapshots');
     checkDraft();
   };
 
   const discard = async () => {
     if (!confirm('Discard all unpublished changes?')) return;
-    await api.post('/api/discard');
+    await api.post('/api/snapshots/discard');
     onSave();
   };
 
@@ -85,11 +91,12 @@ export default function Admin() {
             >Publish</button>
             <button style={{ ...styles.headerBtn, ...styles.headerBtnSecondary }} onClick={discard}>Discard</button>
             <button style={{ ...styles.headerBtn, ...styles.headerBtnSecondary }} onClick={() => setPreviewOpen(true)}>Preview</button>
+            <button style={{ ...styles.headerBtn, ...styles.headerBtnSecondary }} onClick={() => setHistoryOpen(true)}>History</button>
             <a href="/" style={styles.link}>← Dashboard</a>
           </div>
         </header>
 
-        <ConfigSection config={config} onSave={onSave} hasChanged={sectionChanges.config} />
+        <ConfigSection config={config} onSave={onConfigSave} hasChanged={sectionChanges.config} publishedConfig={published?.config || null} />
         <ServicesSection services={services} onSave={onSave} hasChanged={sectionChanges.services} publishedServices={published?.services || null} />
         <EventsSection events={events} config={config} onSave={onSave} hasChanged={sectionChanges.events} publishedEvents={published?.events || null} />
         <AdvisoriesSection advisories={advisories} config={config} onSave={onSave} hasChanged={sectionChanges.advisories} publishedAdvisories={published?.advisories || null} />
@@ -107,11 +114,24 @@ export default function Admin() {
         </div>
       )}
 
+      {historyOpen && (
+        <div style={styles.modalOverlay} onClick={() => setHistoryOpen(false)}>
+          <div style={{ ...styles.modal, width: '700px', maxWidth: '90vw', height: 'auto', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <strong style={{ color: '#e0e0e0' }}>Version History</strong>
+              <button style={styles.smallBtn} onClick={() => setHistoryOpen(false)}>Close</button>
+            </div>
+            <SnapshotHistory onRestore={() => { onSave(); setHistoryOpen(false); }} />
+          </div>
+        </div>
+      )}
+
       <footer style={{ textAlign: 'center', padding: '24px 0 12px', fontSize: '11px', color: '#555' }}>
         Brought to you by <a href="https://github.com/gm2211" style={{ color: '#666' }} target="_blank" rel="noopener noreferrer">gm2211</a>
       </footer>
 
       <style>{`
+        html, body { background: #0a1628; }
         input[type="number"]::-webkit-inner-spin-button,
         input[type="number"]::-webkit-outer-spin-button {
           opacity: 1;
@@ -148,17 +168,33 @@ function StatusSelect({ value, onChange, style }: { value: string; onChange: (v:
   );
 }
 
-function ConfigSection({ config, onSave, hasChanged }: { config: BuildingConfig | null; onSave: () => void; hasChanged: boolean }) {
+function ConfigSection({ config, onSave, hasChanged, publishedConfig }: { config: BuildingConfig | null; onSave: () => void; hasChanged: boolean; publishedConfig: BuildingConfig | null }) {
   const [form, setForm] = useState({ buildingNumber: '', buildingName: '', subtitle: '' });
+  const initializedRef = useRef(false);
 
+  // Only initialize form from config on first load
   useEffect(() => {
-    if (config) setForm({ buildingNumber: config.buildingNumber, buildingName: config.buildingName, subtitle: config.subtitle });
+    if (config && !initializedRef.current) {
+      setForm({ buildingNumber: config.buildingNumber, buildingName: config.buildingName, subtitle: config.subtitle });
+      initializedRef.current = true;
+    }
   }, [config]);
 
-  const save = async () => {
-    await api.put('/api/config', form);
-    onSave();
-  };
+  // Auto-save with debounce when form changes
+  useEffect(() => {
+    if (!initializedRef.current) return;
+    const timer = setTimeout(async () => {
+      await api.put('/api/config', form);
+      onSave(); // Just refreshes draft status, doesn't reload config
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [form, onSave]);
+
+  // Check which fields have changed from published (normalize to strings for comparison)
+  const normalize = (v: any) => String(v ?? '');
+  const numberChanged = publishedConfig && normalize(form.buildingNumber) !== normalize(publishedConfig.buildingNumber);
+  const nameChanged = publishedConfig && normalize(form.buildingName) !== normalize(publishedConfig.buildingName);
+  const subtitleChanged = publishedConfig && normalize(form.subtitle) !== normalize(publishedConfig.subtitle);
 
   return (
     <section style={{ ...styles.section, ...(hasChanged ? styles.sectionChanged : {}) }}>
@@ -169,69 +205,43 @@ function ConfigSection({ config, onSave, hasChanged }: { config: BuildingConfig 
       <div style={{ ...styles.formGroup, marginBottom: 0 }}>
         <span style={styles.formLabel}>Building Details</span>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <input style={styles.input} placeholder="Building #" value={form.buildingNumber} onChange={e => setForm({ ...form, buildingNumber: e.target.value })} />
-          <input style={styles.input} placeholder="Building Name" value={form.buildingName} onChange={e => setForm({ ...form, buildingName: e.target.value })} />
-          <input style={{ ...styles.input, flex: 1 }} placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
-          <button style={styles.btn} onClick={save}>Save Draft</button>
+          <input
+            style={{ ...styles.input, ...(numberChanged ? styles.inputChanged : {}) }}
+            placeholder="Building #"
+            value={form.buildingNumber}
+            onChange={e => setForm({ ...form, buildingNumber: e.target.value })}
+          />
+          <input
+            style={{ ...styles.input, ...(nameChanged ? styles.inputChanged : {}) }}
+            placeholder="Building Name"
+            value={form.buildingName}
+            onChange={e => setForm({ ...form, buildingName: e.target.value })}
+          />
+          <input
+            style={{ ...styles.input, flex: 1, ...(subtitleChanged ? styles.inputChanged : {}) }}
+            placeholder="Subtitle"
+            value={form.subtitle}
+            onChange={e => setForm({ ...form, subtitle: e.target.value })}
+          />
         </div>
       </div>
     </section>
   );
 }
 
-function TrashSection<T extends { id: number }>({ type, items, labelFn, onReload }: { type: string; items: T[]; labelFn: (item: T) => string; onReload: () => void }) {
-  const [open, setOpen] = useState(true);
-
-  const restore = async (id: number) => {
-    await api.post(`/api/${type}/${id}/restore`);
-    onReload();
-  };
-
-  const purge = async (id: number) => {
-    await api.del(`/api/${type}/${id}/purge`);
-    onReload();
-  };
-
-  if (items.length === 0) return null;
-
-  return (
-    <div style={{ marginTop: '12px' }}>
-      <div
-        style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#888', fontSize: '13px', marginBottom: open ? '8px' : 0 }}
-        onClick={() => setOpen(!open)}
-      >
-        <span style={{ fontSize: '10px' }}>{open ? '▼' : '▶'}</span>
-        <span>Trash ({items.length})</span>
-      </div>
-      {open && (
-        <ul style={styles.list}>
-          {items.map(item => (
-            <li key={item.id} style={{ ...styles.listItem, opacity: 0.6 }}>
-              <span>{labelFn(item)}</span>
-              <span>
-                <button style={{ ...styles.smallBtn, background: '#4caf50' }} onClick={() => restore(item.id)}>Restore</button>
-                <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => purge(item.id)}>Purge</button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
 function ServicesSection({ services, onSave, hasChanged, publishedServices }: { services: Service[]; onSave: () => void; hasChanged: boolean; publishedServices: Service[] | null }) {
   const [name, setName] = useState('');
   const [status, setStatus] = useState('Operational');
+  const [formExpanded, setFormExpanded] = useState(false);
   const [expandedNotes, setExpandedNotes] = useState<number | null>(null);
   const [editingNotes, setEditingNotes] = useState<Record<number, string>>({});
-  const { trash, reload, remove } = useTrash<Service>('/api/services', onSave);
 
   const add = async () => {
     if (!name) return;
     await api.post('/api/services', { name, status, sortOrder: services.length });
     setName('');
-    reload();
+    setFormExpanded(false);
+    onSave();
   };
 
   const markForDeletion = async (id: number) => {
@@ -274,14 +284,24 @@ function ServicesSection({ services, onSave, hasChanged, publishedServices }: { 
         Services
         {hasChanged && <span style={styles.changeIndicator}>●</span>}
       </h2>
-      <div style={styles.formGroup}>
-        <span style={styles.formLabel}>Add New Service</span>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <input style={styles.input} placeholder="Service name" value={name} onChange={e => setName(e.target.value)} />
-          <StatusSelect value={status} onChange={setStatus} />
-          <button style={styles.btn} onClick={add}>Add Service to Draft</button>
+      {formExpanded ? (
+        <div style={styles.formGroup}>
+          <span style={styles.formLabel}>Add New Service</span>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <input style={styles.input} placeholder="Service name" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') add(); }} autoFocus />
+            <StatusSelect value={status} onChange={setStatus} />
+            <button style={styles.btn} onClick={add}>Add Service to Draft</button>
+            <button style={{ ...styles.btn, background: '#555' }} onClick={() => { setFormExpanded(false); setName(''); }}>Close</button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <button
+          style={{ ...styles.btn, width: '100%', marginBottom: '16px' }}
+          onClick={() => setFormExpanded(true)}
+        >
+          + Add New Service
+        </button>
+      )}
       {services.length > 0 && (
         <div style={styles.listHeader}>
           <span>Current Services</span>
@@ -296,10 +316,12 @@ function ServicesSection({ services, onSave, hasChanged, publishedServices }: { 
           const statusChanged = pub && pub.status !== s.status;
           const timeChanged = pub && pub.lastChecked !== s.lastChecked;
           const notesChanged = pub && (s.notes || '') !== (pub.notes || '');
+          const nameChanged = pub && pub.name !== s.name;
+          const hasChanges = !isMarkedForDeletion && !isNewDraft && (timeChanged || notesChanged || nameChanged);
           const isExpanded = expandedNotes === s.id && !isMarkedForDeletion;
 
           return (
-            <div key={s.id} style={{ ...styles.listCard, ...(isMarkedForDeletion ? styles.markedForDeletion : {}) }}>
+            <div key={s.id} style={{ ...styles.listCard, ...(isMarkedForDeletion ? styles.markedForDeletion : {}), ...(hasChanges ? styles.itemChanged : {}) }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '12px', ...(isMarkedForDeletion ? { textDecoration: 'line-through', opacity: 0.5 } : {}) }}>
@@ -320,22 +342,22 @@ function ServicesSection({ services, onSave, hasChanged, publishedServices }: { 
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     {isMarkedForDeletion ? (
-                      <button style={{ ...styles.smallBtn, background: '#4caf50' }} onClick={() => unmarkForDeletion(s.id)}>Undo</button>
+                      <button style={{ ...styles.smallBtn, ...styles.smallBtnSuccess }} onClick={() => unmarkForDeletion(s.id)}>Undo</button>
                     ) : (
                       <>
                         <button
-                          style={{ ...styles.smallBtn, background: isExpanded ? '#00838f' : '#444', fontSize: '10px' }}
+                          style={{ ...styles.smallBtn, ...(isExpanded ? styles.smallBtnInfo : {}), fontSize: '10px' }}
                           onClick={() => setExpandedNotes(isExpanded ? null : s.id)}
                           title={s.notes ? 'Edit note' : 'Add note'}
                         >
                           {s.notes ? '📝' : '+ Note'}
                         </button>
-                        <button style={{ ...styles.smallBtn, background: '#555', fontSize: '10px' }} onClick={() => setLastCheckedNow(s)} title="Mark as just checked">Just Checked</button>
+                        <button style={{ ...styles.smallBtn, fontSize: '10px' }} onClick={() => setLastCheckedNow(s)} title="Mark as just checked">Just Checked</button>
                         {statusChanged && (
                           <span style={{ fontSize: '10px', opacity: 0.8, color: STATUS_COLORS[pub.status] }}>{pub.status} →</span>
                         )}
                         <StatusSelect value={s.status} onChange={v => changeStatus(s, v)} style={{ padding: '4px 8px', fontSize: '12px' }} />
-                        <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => markForDeletion(s.id)}>✕</button>
+                        <button style={{ ...styles.smallBtn, ...styles.smallBtnDanger }} onClick={() => markForDeletion(s.id)}>✕</button>
                       </>
                     )}
                   </span>
@@ -360,7 +382,7 @@ function ServicesSection({ services, onSave, hasChanged, publishedServices }: { 
                       autoFocus
                     />
                     <button
-                      style={{ ...styles.smallBtn, background: '#00838f' }}
+                      style={{ ...styles.smallBtn, ...styles.smallBtnInfo }}
                       onClick={() => {
                         const newNotes = editingNotes[s.id] ?? s.notes ?? '';
                         updateNotes(s, newNotes);
@@ -371,7 +393,7 @@ function ServicesSection({ services, onSave, hasChanged, publishedServices }: { 
                       Save
                     </button>
                     <button
-                      style={{ ...styles.smallBtn, background: '#555' }}
+                      style={styles.smallBtn}
                       onClick={() => {
                         setEditingNotes(prev => { const copy = { ...prev }; delete copy[s.id]; return copy; });
                         setExpandedNotes(null);
@@ -387,7 +409,6 @@ function ServicesSection({ services, onSave, hasChanged, publishedServices }: { 
           );
         })}
       </div>
-      <TrashSection type="services" items={trash} labelFn={s => s.name} onReload={reload} />
     </section>
   );
 }
@@ -564,7 +585,7 @@ function MarkdownEditor({ value, onChange, placeholder, cardPreview }: { value: 
         <span style={{ fontSize: '12px', color: '#888' }}>Details (markdown supported)</span>
         <button
           type="button"
-          style={{ ...styles.smallBtn, background: showPreview ? '#00838f' : '#555', marginLeft: 'auto' }}
+          style={{ ...styles.smallBtn, ...(showPreview ? styles.smallBtnInfo : {}), marginLeft: 'auto' }}
           onClick={() => setShowPreview(!showPreview)}
         >
           {showPreview ? 'Edit' : (cardPreview ? 'Preview Card' : 'Preview')}
@@ -605,12 +626,14 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
   const empty = { title: '', subtitle: '', details: '' as string, imageUrl: '' };
   const [form, setForm] = useState(empty);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [formExpanded, setFormExpanded] = useState(false);
   const [previewEvent, setPreviewEvent] = useState<Event | null>(null);
   const [previewingForm, setPreviewingForm] = useState(false);
   const [scrollSpeedText, setScrollSpeedText] = useState(String(config?.scrollSpeed ?? 30));
   const [errors, setErrors] = useState<{ title?: boolean }>({});
   const [shake, setShake] = useState(false);
-  const { trash, reload, remove } = useTrash<Event>('/api/events', onSave);
+
+  const isFormOpen = formExpanded || editingId !== null;
 
   const markForDeletion = async (id: number) => {
     await api.del(`/api/events/${id}`);
@@ -655,11 +678,13 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
     }
     setForm(empty);
     setEditingId(null);
-    reload();
+    setFormExpanded(false);
+    onSave();
   };
 
   const startEdit = (e: Event) => {
     setEditingId(e.id);
+    setFormExpanded(true);
     setForm({
       title: e.title,
       subtitle: e.subtitle,
@@ -670,6 +695,7 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
 
   const cancelEdit = () => {
     setEditingId(null);
+    setFormExpanded(false);
     setForm(empty);
   };
 
@@ -679,39 +705,48 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
         Events
         {hasChanged && <span style={styles.changeIndicator}>●</span>}
       </h2>
-      <div style={styles.formGroup}>
-        <span style={styles.formLabel}>{editingId ? 'Edit Event' : 'Add New Event'}</span>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ fontSize: '10px', color: '#888' }}>Title <span style={{ color: '#f44336' }}>*</span></span>
-              <input
-                className={`${errors.title ? 'field-error' : ''} ${shake && errors.title ? 'shake' : ''}`}
-                style={{ ...styles.input, width: '100%' }}
-                placeholder="Title"
-                value={form.title}
-                onChange={e => { setForm({ ...form, title: e.target.value }); setErrors({}); }}
-              />
+      {isFormOpen ? (
+        <div style={styles.formGroup}>
+          <span style={styles.formLabel}>{editingId ? 'Edit Event' : 'Add New Event'}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '10px', color: '#888' }}>Title <span style={{ color: '#f44336' }}>*</span></span>
+                <input
+                  className={`${errors.title ? 'field-error' : ''} ${shake && errors.title ? 'shake' : ''}`}
+                  style={{ ...styles.input, width: '100%' }}
+                  placeholder="Title"
+                  value={form.title}
+                  onChange={e => { setForm({ ...form, title: e.target.value }); setErrors({}); }}
+                />
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '10px', color: '#888' }}>Subtitle</span>
+                <input style={{ ...styles.input, width: '100%' }} placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
+              </div>
             </div>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ fontSize: '10px', color: '#888' }}>Subtitle</span>
-              <input style={{ ...styles.input, width: '100%' }} placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
+            <ImagePicker label="Image" value={form.imageUrl} onChange={imageUrl => setForm({ ...form, imageUrl })} />
+            <MarkdownEditor
+              key={editingId ?? 'new'}
+              value={form.details}
+              onChange={details => setForm({ ...form, details })}
+              cardPreview={{ title: form.title, subtitle: form.subtitle, imageUrl: form.imageUrl }}
+            />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button style={styles.btn} onClick={submit}>{editingId ? 'Save Draft' : 'Add Event to Draft'}</button>
+              <button style={{ ...styles.btn, background: '#00838f' }} onClick={() => setPreviewingForm(true)}>Preview</button>
+              <button style={{ ...styles.btn, background: '#555' }} onClick={cancelEdit}>{editingId ? 'Cancel' : 'Close'}</button>
             </div>
-          </div>
-          <ImagePicker label="Image" value={form.imageUrl} onChange={imageUrl => setForm({ ...form, imageUrl })} />
-          <MarkdownEditor
-            key={editingId ?? 'new'}
-            value={form.details}
-            onChange={details => setForm({ ...form, details })}
-            cardPreview={{ title: form.title, subtitle: form.subtitle, imageUrl: form.imageUrl }}
-          />
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button style={styles.btn} onClick={submit}>{editingId ? 'Save Draft' : 'Add Event to Draft'}</button>
-            <button style={{ ...styles.btn, background: '#00838f' }} onClick={() => setPreviewingForm(true)}>Preview</button>
-            {editingId && <button style={{ ...styles.btn, background: '#555' }} onClick={cancelEdit}>Cancel</button>}
           </div>
         </div>
-      </div>
+      ) : (
+        <button
+          style={{ ...styles.btn, width: '100%', marginBottom: '16px' }}
+          onClick={() => setFormExpanded(true)}
+        >
+          + Add New Event
+        </button>
+      )}
 
       {previewingForm && (
         <div style={styles.modalOverlay} onClick={() => setPreviewingForm(false)}>
@@ -738,10 +773,17 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
       )}
       <div>
         {events.map(e => {
-          const isNewDraft = !publishedEvents?.find(pe => pe.id === e.id);
+          const pub = publishedEvents?.find(pe => pe.id === e.id);
+          const isNewDraft = !pub;
           const isMarkedForDeletion = e.markedForDeletion;
+          const hasChanges = !isMarkedForDeletion && !isNewDraft && pub && (
+            pub.title !== e.title ||
+            pub.subtitle !== e.subtitle ||
+            pub.imageUrl !== e.imageUrl ||
+            JSON.stringify(pub.details) !== JSON.stringify(e.details)
+          );
           return (
-            <div key={e.id} style={{ ...styles.listCard, ...(isMarkedForDeletion ? styles.markedForDeletion : {}) }}>
+            <div key={e.id} style={{ ...styles.listCard, ...(isMarkedForDeletion ? styles.markedForDeletion : {}), ...(hasChanges ? styles.itemChanged : {}) }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, ...(isMarkedForDeletion ? { textDecoration: 'line-through', opacity: 0.5 } : {}) }}>
                 {isNewDraft && !isMarkedForDeletion && <span style={styles.draftIndicator} title="New draft item">●</span>}
                 {isMarkedForDeletion && <span style={{ color: '#f44336', fontSize: '10px' }} title="Will be deleted on publish">🗑</span>}
@@ -767,12 +809,12 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
               </div>
               <span style={{ display: 'flex', gap: '4px' }}>
                 {isMarkedForDeletion ? (
-                  <button style={{ ...styles.smallBtn, background: '#4caf50' }} onClick={() => unmarkForDeletion(e.id)}>Undo</button>
+                  <button style={{ ...styles.smallBtn, ...styles.smallBtnSuccess }} onClick={() => unmarkForDeletion(e.id)}>Undo</button>
                 ) : (
                   <>
-                    <button style={{ ...styles.smallBtn, background: '#00838f', fontSize: '10px' }} onClick={() => setPreviewEvent(e)}>Preview</button>
-                    <button style={{ ...styles.smallBtn, background: '#1976d2' }} onClick={() => startEdit(e)} title="Edit">✎</button>
-                    <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => markForDeletion(e.id)} title="Delete">✕</button>
+                    <button style={{ ...styles.smallBtn, ...styles.smallBtnInfo, fontSize: '10px' }} onClick={() => setPreviewEvent(e)}>Preview</button>
+                    <button style={{ ...styles.smallBtn, ...styles.smallBtnPrimary }} onClick={() => startEdit(e)} title="Edit">✎</button>
+                    <button style={{ ...styles.smallBtn, ...styles.smallBtnDanger }} onClick={() => markForDeletion(e.id)} title="Delete">✕</button>
                   </>
                 )}
               </span>
@@ -797,8 +839,6 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
           </div>
         </div>
       )}
-      <TrashSection type="events" items={trash} labelFn={e => e.title} onReload={reload} />
-
       <div style={{ marginTop: '12px' }}>
         <label style={{ color: '#e0e0e0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           Scroll duration
@@ -835,7 +875,7 @@ function LabelPicker({ value, onChange, style }: { value: string; onChange: (v: 
   return (
     <div style={{ display: 'flex', gap: '4px', ...style }}>
       <select
-        style={{ ...styles.input, fontWeight: 700, flex: 1 }}
+        style={{ ...styles.input, fontWeight: 700, flex: 1, height: '100%', boxSizing: 'border-box' }}
         value={isCustom ? '__custom__' : value}
         onChange={e => handleSelect(e.target.value)}
       >
@@ -844,7 +884,7 @@ function LabelPicker({ value, onChange, style }: { value: string; onChange: (v: 
       </select>
       {isCustom && (
         <input
-          style={{ ...styles.input, flex: 1, fontWeight: 700 }}
+          style={{ ...styles.input, flex: 1, fontWeight: 700, height: '100%', boxSizing: 'border-box' }}
           placeholder="Custom label"
           value={value}
           onChange={e => onChange(e.target.value)}
@@ -855,11 +895,13 @@ function LabelPicker({ value, onChange, style }: { value: string; onChange: (v: 
 }
 
 function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAdvisories }: { advisories: Advisory[]; config: BuildingConfig | null; onSave: () => void; hasChanged: boolean; publishedAdvisories: Advisory[] | null }) {
-  const [form, setForm] = useState({ label: ADVISORY_PRESETS[0], message: '' });
-  const [tickerSpeedText, setTickerSpeedText] = useState(String(config?.tickerSpeed ?? 25));
+  const empty = { label: ADVISORY_PRESETS[0], message: '' };
+  const [form, setForm] = useState(empty);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({ label: '', message: '' });
-  const { trash, reload, remove } = useTrash<Advisory>('/api/advisories', onSave);
+  const [formExpanded, setFormExpanded] = useState(false);
+  const [tickerSpeedText, setTickerSpeedText] = useState(String(config?.tickerSpeed ?? 25));
+
+  const isFormOpen = formExpanded || editingId !== null;
 
   useEffect(() => {
     if (config) setTickerSpeedText(String(config.tickerSpeed));
@@ -882,28 +924,29 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAd
     onSave();
   };
 
-  const add = async () => {
-    if (!form.message) return;
-    await api.post('/api/advisories', form);
-    setForm({ label: ADVISORY_PRESETS[0], message: '' });
-    reload();
+  const submit = async () => {
+    if (!form.message.trim()) return;
+    if (editingId) {
+      await api.put(`/api/advisories/${editingId}`, form);
+    } else {
+      await api.post('/api/advisories', form);
+    }
+    setForm(empty);
+    setEditingId(null);
+    setFormExpanded(false);
+    onSave();
   };
 
   const startEdit = (a: Advisory) => {
     setEditingId(a.id);
-    setEditForm({ label: a.label, message: a.message });
+    setFormExpanded(true);
+    setForm({ label: a.label, message: a.message });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditForm({ label: '', message: '' });
-  };
-
-  const saveEdit = async (a: Advisory) => {
-    await api.put(`/api/advisories/${a.id}`, { label: editForm.label, message: editForm.message });
-    setEditingId(null);
-    setEditForm({ label: '', message: '' });
-    onSave();
+    setFormExpanded(false);
+    setForm(empty);
   };
 
   const toggleActive = async (a: Advisory) => {
@@ -917,14 +960,36 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAd
         Advisories
         {hasChanged && <span style={styles.changeIndicator}>●</span>}
       </h2>
-      <div style={styles.formGroup}>
-        <span style={styles.formLabel}>Add New Advisory</span>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <LabelPicker style={{ width: '200px' }} value={form.label} onChange={label => setForm({ ...form, label })} />
-          <input style={{ ...styles.input, flex: 1 }} placeholder="Message" value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} />
-          <button style={styles.btn} onClick={add}>Add Advisory to Draft</button>
+      {isFormOpen ? (
+        <div style={styles.formGroup}>
+          <span style={styles.formLabel}>{editingId ? 'Edit Advisory' : 'Add New Advisory'}</span>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontSize: '10px', color: '#888' }}>Label</span>
+              <LabelPicker style={{ width: '200px', height: '38px' }} value={form.label} onChange={label => setForm({ ...form, label })} />
+            </div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontSize: '10px', color: '#888' }}>Message <span style={{ color: '#f44336' }}>*</span></span>
+              <input
+                style={{ ...styles.input, width: '100%', height: '38px', boxSizing: 'border-box' }}
+                placeholder="Message"
+                value={form.message}
+                onChange={e => setForm({ ...form, message: e.target.value })}
+                onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+              />
+            </div>
+            <button style={styles.btn} onClick={submit}>{editingId ? 'Save Draft' : 'Add Advisory to Draft'}</button>
+            <button style={{ ...styles.btn, background: '#555' }} onClick={cancelEdit}>{editingId ? 'Cancel' : 'Close'}</button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <button
+          style={{ ...styles.btn, width: '100%', marginBottom: '16px' }}
+          onClick={() => setFormExpanded(true)}
+        >
+          + Add New Advisory
+        </button>
+      )}
       {advisories.length > 0 && (
         <div style={styles.listHeader}>
           <span>Current Advisories</span>
@@ -936,13 +1001,14 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAd
           const pub = publishedAdvisories?.find(pa => pa.id === a.id);
           const isNewDraft = !pub;
           const isMarkedForDeletion = a.markedForDeletion;
-          const isEditing = editingId === a.id;
+          const isBeingEdited = editingId === a.id;
           const labelChanged = pub && pub.label !== a.label;
           const messageChanged = pub && pub.message !== a.message;
           const activeChanged = pub && pub.active !== a.active;
+          const hasChanges = !isMarkedForDeletion && !isNewDraft && (labelChanged || messageChanged);
 
           return (
-            <div key={a.id} style={{ ...styles.listCard, flexDirection: 'column', gap: '8px', opacity: isMarkedForDeletion ? 1 : (a.active ? 1 : 0.5), ...(isMarkedForDeletion ? styles.markedForDeletion : {}) }}>
+            <div key={a.id} style={{ ...styles.listCard, flexDirection: 'column', gap: '8px', opacity: isMarkedForDeletion ? 1 : (a.active ? 1 : 0.5), ...(isMarkedForDeletion ? styles.markedForDeletion : {}), ...(isBeingEdited ? { borderColor: '#00838f', borderWidth: '2px' } : {}), ...(!isBeingEdited && hasChanges ? styles.itemChanged : {}) }}>
               <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '8px' }}>
                 {isNewDraft && !isMarkedForDeletion && <span style={styles.draftIndicator} title="New draft item">●</span>}
                 {isMarkedForDeletion && <span style={{ color: '#f44336', fontSize: '10px' }} title="Will be deleted on publish">🗑</span>}
@@ -953,58 +1019,32 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAd
                 </div>
                 <span style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                   {isMarkedForDeletion ? (
-                    <button style={{ ...styles.smallBtn, background: '#4caf50' }} onClick={() => unmarkForDeletion(a.id)}>Undo</button>
+                    <button style={{ ...styles.smallBtn, ...styles.smallBtnSuccess }} onClick={() => unmarkForDeletion(a.id)}>Undo</button>
                   ) : (
                     <>
                       {activeChanged && (
                         <span style={{ fontSize: '10px', color: '#ffc107', opacity: 0.8 }}>{pub.active ? 'ON' : 'OFF'} →</span>
                       )}
                       <button style={{ ...styles.smallBtn, background: a.active ? '#4caf50' : '#888' }} onClick={() => toggleActive(a)}>{a.active ? 'ON' : 'OFF'}</button>
-                      <button style={{ ...styles.smallBtn, background: isEditing ? '#00838f' : '#1976d2' }} onClick={() => isEditing ? cancelEdit() : startEdit(a)}>✎</button>
-                      <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => markForDeletion(a.id)}>✕</button>
+                      <button style={{ ...styles.smallBtn, background: isBeingEdited ? '#00838f' : '#1976d2' }} onClick={() => isBeingEdited ? cancelEdit() : startEdit(a)}>✎</button>
+                      <button style={{ ...styles.smallBtn, ...styles.smallBtnDanger }} onClick={() => markForDeletion(a.id)}>✕</button>
                     </>
                   )}
                 </span>
               </div>
 
               {/* Diff indicators */}
-              {!isMarkedForDeletion && !isEditing && (labelChanged || messageChanged) && (
+              {!isMarkedForDeletion && (labelChanged || messageChanged) && (
                 <div style={{ fontSize: '11px', color: '#ffc107', opacity: 0.8, paddingLeft: '16px' }}>
                   {labelChanged && <span>Label was: {pub.label}</span>}
                   {labelChanged && messageChanged && <span style={{ margin: '0 8px' }}>•</span>}
                   {messageChanged && <span>Message was: "{pub.message}"</span>}
                 </div>
               )}
-
-              {/* Edit form */}
-              {isEditing && !isMarkedForDeletion && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '11px', color: '#888', width: '60px' }}>Label:</span>
-                    <LabelPicker style={{ flex: 1 }} value={editForm.label} onChange={label => setEditForm({ ...editForm, label })} />
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '11px', color: '#888', width: '60px' }}>Message:</span>
-                    <input
-                      style={{ ...styles.input, flex: 1 }}
-                      value={editForm.message}
-                      onChange={e => setEditForm({ ...editForm, message: e.target.value })}
-                      onKeyDown={e => { if (e.key === 'Enter') saveEdit(a); if (e.key === 'Escape') cancelEdit(); }}
-                      autoFocus
-                    />
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                    <button style={{ ...styles.smallBtn, background: '#00838f' }} onClick={() => saveEdit(a)}>Save</button>
-                    <button style={{ ...styles.smallBtn, background: '#555' }} onClick={cancelEdit}>Cancel</button>
-                  </div>
-                </div>
-              )}
             </div>
           );
         })}
       </div>
-      <TrashSection type="advisories" items={trash} labelFn={a => `${a.label}: ${a.message}`} onReload={reload} />
-
       <div style={{ marginTop: '12px' }}>
         <label style={{ color: '#e0e0e0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           Scroll duration
@@ -1059,6 +1099,14 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'block',
   },
   input: { background: '#0a1628', border: '1px solid #1a3050', borderRadius: '6px', padding: '8px 12px', color: '#e0e0e0', fontSize: '14px' },
+  inputChanged: {
+    borderColor: 'rgba(255, 193, 7, 0.6)',
+    boxShadow: '0 0 6px rgba(255, 193, 7, 0.3)',
+  },
+  itemChanged: {
+    boxShadow: 'inset 0 0 0 1px rgba(255, 193, 7, 0.5), 0 0 8px rgba(255, 193, 7, 0.2)',
+    borderColor: 'rgba(255, 193, 7, 0.5)',
+  },
   listHeader: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -1108,7 +1156,36 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#8ab4d4',
     border: '1px solid #2a4060',
   },
-  smallBtn: { border: 'none', borderRadius: '4px', padding: '4px 10px', color: '#fff', cursor: 'pointer', fontSize: '12px', marginLeft: '6px' },
+  smallBtn: {
+    borderRadius: '4px',
+    padding: '4px 10px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    marginLeft: '6px',
+    background: 'linear-gradient(135deg, #2a3a50 0%, #1a2535 100%)',
+    color: '#a0b0c0',
+    border: '1px solid #3a4a60',
+  },
+  smallBtnDanger: {
+    background: 'linear-gradient(135deg, #5a2a2a 0%, #3d1a1a 100%)',
+    color: '#e8a0a0',
+    border: '1px solid #7a3a3a',
+  },
+  smallBtnSuccess: {
+    background: 'linear-gradient(135deg, #2a5a3a 0%, #1a3d28 100%)',
+    color: '#a0e8b0',
+    border: '1px solid #3a7a4a',
+  },
+  smallBtnPrimary: {
+    background: 'linear-gradient(135deg, #2a4a6a 0%, #1a3050 100%)',
+    color: '#a0c8e8',
+    border: '1px solid #3a5a7a',
+  },
+  smallBtnInfo: {
+    background: 'linear-gradient(135deg, #1a5a5a 0%, #0d3d3d 100%)',
+    color: '#a0d8d8',
+    border: '1px solid #2a7a7a',
+  },
   list: { listStyle: 'none', padding: 0 },
   listItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #1a3050' },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },

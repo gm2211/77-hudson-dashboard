@@ -35,3 +35,25 @@ export interface BuildingConfig {
   scrollSpeed: number;
   tickerSpeed: number;
 }
+
+export interface Snapshot {
+  id: number;
+  version: number;
+  publishedAt: string;
+}
+
+export interface SnapshotData {
+  version: number;
+  publishedAt: string;
+  services: Service[];
+  events: Event[];
+  advisories: Advisory[];
+  config: BuildingConfig | null;
+}
+
+export interface SnapshotDiff {
+  services: { added: Service[]; removed: Service[]; changed: { from: Service; to: Service }[] };
+  events: { added: Event[]; removed: Event[]; changed: { from: Event; to: Event }[] };
+  advisories: { added: Advisory[]; removed: Advisory[]; changed: { from: Advisory; to: Advisory }[] };
+  config: { changed: { field: string; from: any; to: any }[] };
+}

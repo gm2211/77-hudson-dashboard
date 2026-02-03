@@ -1,10 +1,7 @@
 import { Router } from 'express';
 import prisma from '../db.js';
-import { addSoftDeleteRoutes } from './softDelete.js';
 
 const router = Router();
-
-addSoftDeleteRoutes(router, prisma.service);
 
 router.get('/', async (_req, res) => {
   const services = await prisma.service.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } });
