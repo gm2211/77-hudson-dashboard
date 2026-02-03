@@ -1,10 +1,5 @@
 import type { Service } from '../types';
-
-const statusColor: Record<string, string> = {
-  Operational: '#4caf50',
-  Maintenance: '#ff9800',
-  Outage: '#f44336',
-};
+import { STATUS_COLORS } from '../constants';
 
 function timeAgo(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
@@ -33,7 +28,7 @@ export default function ServiceTable({ services }: { services: Service[] }) {
               <td style={styles.td}>{s.name}</td>
               <td style={styles.td}>
                 <span style={styles.statusCell}>
-                  <span style={{ ...styles.dot, background: statusColor[s.status] || '#888' }} />
+                  <span style={{ ...styles.dot, background: STATUS_COLORS[s.status] || '#888' }} />
                   {s.status}
                 </span>
               </td>

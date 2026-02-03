@@ -1,29 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Service, Event, Advisory, BuildingConfig } from '../types';
-
-const JSON_HEADERS = { 'Content-Type': 'application/json' };
-
-const api = {
-  get: (url: string) => fetch(url).then(r => r.json()),
-  post: (url: string, body?: any) => fetch(url, { method: 'POST', headers: JSON_HEADERS, body: body ? JSON.stringify(body) : undefined }).then(r => r.json()),
-  put: (url: string, body: any) => fetch(url, { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(body) }).then(r => r.json()),
-  del: (url: string) => fetch(url, { method: 'DELETE' }).then(r => r.json()),
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  Operational: '#4caf50',
-  Maintenance: '#ffc107',
-  Outage: '#f44336',
-};
-
-function useTrash<T>(endpoint: string, onSave: () => void) {
-  const [trash, setTrash] = useState<T[]>([]);
-  const loadTrash = useCallback(() => { api.get(`${endpoint}/trash`).then(setTrash); }, [endpoint]);
-  useEffect(() => { loadTrash(); }, [loadTrash]);
-  const reload = () => { onSave(); loadTrash(); };
-  const remove = async (id: number) => { await api.del(`${endpoint}/${id}`); reload(); };
-  return { trash, reload, remove };
-}
+import { api } from '../utils/api';
+import { parseMarkdown } from '../utils/markdown';
+import { useTrash } from '../hooks/useTrash';
+import { STATUS_COLORS, ADVISORY_PRESETS, IMAGE_PRESETS, CONFIG } from '../constants';
 
 type SectionChanges = {
   config: boolean;
@@ -412,12 +392,6 @@ function ServicesSection({ services, onSave, hasChanged, publishedServices }: { 
   );
 }
 
-const IMAGE_PRESETS = [
-  { label: 'Yoga', url: '/images/yoga.jpg' },
-  { label: 'Bagels / Brunch', url: '/images/bagels.jpg' },
-  { label: 'Tequila / Drinks', url: '/images/tequila.jpg' },
-];
-
 function ImagePicker({ value, onChange, label }: { value: string; onChange: (v: string) => void; label?: string }) {
   const isPreset = IMAGE_PRESETS.some(p => p.url === value);
   const isCustom = !!value && !isPreset;
@@ -475,79 +449,6 @@ function ImagePicker({ value, onChange, label }: { value: string; onChange: (v: 
       </div>
     </div>
   );
-}
-
-function parseMarkdown(md: string): string {
-  const lines = md.split('\n');
-  const result: string[] = [];
-  let inBulletList = false;
-  let inNumberedList = false;
-  let listCounter = 0;
-
-  const bulletStyle = 'list-style:none;padding:0;margin:8px 0';
-  const olStyle = 'list-style:none;padding:0;margin:8px 0;counter-reset:item';
-  const bulletLiStyle = 'display:flex;align-items:baseline;gap:8px;margin-bottom:4px';
-  const olLiStyle = 'display:flex;align-items:baseline;gap:8px;margin-bottom:4px;counter-increment:item';
-
-  for (const line of lines) {
-    let processed = line;
-
-    // Check for list items
-    const bulletMatch = processed.match(/^[-*]\s+(.*)$/);
-    const numberedMatch = processed.match(/^\d+\.\s+(.*)$/);
-
-    if (bulletMatch) {
-      if (!inBulletList) {
-        if (inNumberedList) { result.push('</ol>'); inNumberedList = false; }
-        result.push(`<ul style="${bulletStyle}">`);
-        inBulletList = true;
-      }
-      processed = `<li style="${bulletLiStyle}"><span style="color:#e0e0e0;font-size:8px;flex-shrink:0">●</span><span>${bulletMatch[1]}</span></li>`;
-    } else if (numberedMatch) {
-      if (!inNumberedList) {
-        if (inBulletList) { result.push('</ul>'); inBulletList = false; }
-        result.push(`<ol style="${olStyle}">`);
-        inNumberedList = true;
-        listCounter = 0;
-      }
-      listCounter++;
-      processed = `<li style="${olLiStyle}"><span style="color:#e0e0e0;font-size:12px;flex-shrink:0;min-width:16px">${listCounter}.</span><span>${numberedMatch[1]}</span></li>`;
-    } else {
-      // Close any open lists
-      if (inBulletList) { result.push('</ul>'); inBulletList = false; }
-      if (inNumberedList) { result.push('</ol>'); inNumberedList = false; listCounter = 0; }
-
-      // Headers
-      if (processed.match(/^### (.+)$/)) {
-        processed = processed.replace(/^### (.+)$/, '<h3 style="margin:8px 0 4px;font-size:14px">$1</h3>');
-      } else if (processed.match(/^## (.+)$/)) {
-        processed = processed.replace(/^## (.+)$/, '<h2 style="margin:8px 0 4px;font-size:16px">$1</h2>');
-      } else if (processed.match(/^# (.+)$/)) {
-        processed = processed.replace(/^# (.+)$/, '<h1 style="margin:8px 0 4px;font-size:18px">$1</h1>');
-      } else if (processed.trim() === '') {
-        processed = '<br/>';
-      } else {
-        processed = processed + '<br/>';
-      }
-    }
-
-    // Inline formatting (apply to all lines)
-    processed = processed
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/__(.+?)__/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/_(.+?)_/g, '<em>$1</em>')
-      .replace(/~~(.+?)~~/g, '<del>$1</del>')
-      .replace(/`(.+?)`/g, '<code style="background:#1a3050;padding:2px 4px;border-radius:3px">$1</code>');
-
-    result.push(processed);
-  }
-
-  // Close any remaining open lists
-  if (inBulletList) result.push('</ul>');
-  if (inNumberedList) result.push('</ol>');
-
-  return result.join('');
 }
 
 type CardPreviewData = {
@@ -919,15 +820,6 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
     </section>
   );
 }
-
-const ADVISORY_PRESETS = [
-  'RESIDENT ADVISORY',
-  'MAINTENANCE NOTICE',
-  'EMERGENCY ALERT',
-  'BUILDING UPDATE',
-  'SECURITY NOTICE',
-  'WEATHER ADVISORY',
-];
 
 function LabelPicker({ value, onChange, style }: { value: string; onChange: (v: string) => void; style?: React.CSSProperties }) {
   const isCustom = !ADVISORY_PRESETS.includes(value);
