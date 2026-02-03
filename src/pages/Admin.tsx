@@ -466,18 +466,17 @@ type CardPreviewData = {
 function EventCardPreview({ title, subtitle, imageUrl, details }: CardPreviewData & { details: string }) {
   // Match actual EventCard component styling
   const cardStyle: React.CSSProperties = {
-    background: 'linear-gradient(135deg, #1a5c5a 0%, #1a4a48 100%)',
+    background: imageUrl
+      ? `linear-gradient(to right, rgba(20,60,58,0.92) 0%, rgba(20,60,58,0.75) 50%, rgba(20,60,58,0.3) 100%), url(${imageUrl})`
+      : 'linear-gradient(135deg, #1a5c5a 0%, #1a4a48 100%)',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
     borderRadius: '12px',
     overflow: 'hidden',
     border: '1px solid rgba(255,255,255,0.1)',
     display: 'flex',
     flexDirection: 'column',
     maxWidth: '320px',
-    ...(imageUrl ? {
-      backgroundImage: `linear-gradient(to right, rgba(20,60,58,0.92) 0%, rgba(20,60,58,0.75) 50%, rgba(20,60,58,0.3) 100%), url(${imageUrl})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-    } : {}),
   };
 
   const renderedMarkdown = parseMarkdown(details);

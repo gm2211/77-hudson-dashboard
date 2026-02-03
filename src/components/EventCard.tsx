@@ -75,9 +75,9 @@ export default function EventCard({ event }: { event: Event }) {
   return (
     <div style={{
       ...styles.card,
-      backgroundImage: event.imageUrl
+      background: event.imageUrl
         ? `linear-gradient(to right, rgba(20,60,58,0.92) 0%, rgba(20,60,58,0.75) 50%, rgba(20,60,58,0.3) 100%), url(${event.imageUrl})`
-        : undefined,
+        : 'linear-gradient(135deg, #1a5c5a 0%, #1a4a48 100%)',
       backgroundSize: 'cover',
       backgroundPosition: 'center',
     }}>
