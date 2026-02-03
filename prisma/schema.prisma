@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Service {
+  id          Int      @id @default(autoincrement())
+  name        String
+  status      String   @default("Operational")
+  lastChecked DateTime @default(now())
+  sortOrder   Int      @default(0)
+}
+
+model Event {
+  id          Int      @id @default(autoincrement())
+  title       String
+  subtitle    String   @default("")
+  details     String   @default("[]")
+  imageUrl    String   @default("")
+  accentColor String   @default("")
+  sortOrder   Int      @default(0)
+}
+
+model Advisory {
+  id      Int      @id @default(autoincrement())
+  label   String   @default("RESIDENT ADVISORY")
+  message String
+  active  Boolean  @default(true)
+}
+
+model BuildingConfig {
+  id             Int    @id @default(autoincrement())
+  buildingNumber String @default("77")
+  buildingName   String @default("Hudson Dashboard")
+  subtitle       String @default("Real-time System Monitor")
+}

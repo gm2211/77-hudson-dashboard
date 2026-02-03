@@ -1,0 +1,26 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0a1628;
+  color: #e0e0e0;
+  overflow-x: hidden;
+}
+
+:root {
+  --teal: #00bcd4;
+  --teal-dark: #00838f;
+  --dark-bg: #0a1628;
+  --card-bg: #132038;
+  --card-border: #1a3050;
+  --text-primary: #ffffff;
+  --text-secondary: #8899aa;
+  --green: #4caf50;
+  --yellow: #ffc107;
+  --red: #f44336;
+  --orange: #ff9800;
+}
