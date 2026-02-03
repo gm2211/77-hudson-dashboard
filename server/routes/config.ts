@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import prisma from '../db.js';
-import { broadcast } from '../sse.js';
 
 const router = Router();
 
@@ -23,7 +22,6 @@ router.put('/', async (req, res) => {
     });
   }
   res.json(config);
-  broadcast();
 });
 
 export default router;

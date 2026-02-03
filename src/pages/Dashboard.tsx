@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import Header from '../components/Header';
 import ServiceTable from '../components/ServiceTable';
 import EventCard from '../components/EventCard';
@@ -11,12 +11,23 @@ export default function Dashboard() {
   const [advisories, setAdvisories] = useState<Advisory[]>([]);
   const [config, setConfig] = useState<BuildingConfig | null>(null);
 
+  const isPreview = new URLSearchParams(window.location.search).get('preview') === 'true';
+
   const fetchAll = useCallback(() => {
-    fetch('/api/services').then(r => r.json()).then(setServices);
-    fetch('/api/events').then(r => r.json()).then(setEvents);
-    fetch('/api/advisories').then(r => r.json()).then(setAdvisories);
-    fetch('/api/config').then(r => r.json()).then(setConfig);
-  }, []);
+    if (isPreview) {
+      fetch('/api/services').then(r => r.json()).then(setServices);
+      fetch('/api/events').then(r => r.json()).then(setEvents);
+      fetch('/api/advisories').then(r => r.json()).then(setAdvisories);
+      fetch('/api/config').then(r => r.json()).then(setConfig);
+    } else {
+      fetch('/api/published').then(r => r.json()).then(data => {
+        setServices(data.services || []);
+        setEvents(data.events || []);
+        setAdvisories(data.advisories || []);
+        setConfig(data.config || null);
+      });
+    }
+  }, [isPreview]);
 
   useEffect(() => {
     fetchAll();
@@ -27,6 +38,7 @@ export default function Dashboard() {
   }, [fetchAll]);
 
   const scrollSpeed = config?.scrollSpeed ?? 30;
+  const tickerSpeed = config?.tickerSpeed ?? 25;
 
   return (
     <div style={styles.page}>
@@ -35,7 +47,7 @@ export default function Dashboard() {
         <ServiceTable services={services} />
         <AutoScrollCards events={events} scrollSpeed={scrollSpeed} />
       </div>
-      <AdvisoryTicker advisories={advisories} />
+      <AdvisoryTicker advisories={advisories} tickerSpeed={tickerSpeed} />
       <style>{`
         html, body { overflow: hidden; height: 100%; }
         #root { height: 100%; }
@@ -48,6 +60,7 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
   const containerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [needsScroll, setNeedsScroll] = useState(false);
+  const isDoubledRef = useRef(false);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -55,7 +68,11 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
     if (!container || !inner) return;
 
     const check = () => {
-      setNeedsScroll(inner.scrollHeight > container.clientHeight);
+      // When currently doubled, estimate single-content height as half
+      const measuredHeight = inner.scrollHeight;
+      const singleHeight = isDoubledRef.current ? measuredHeight / 2 : measuredHeight;
+      const needs = singleHeight > container.clientHeight;
+      setNeedsScroll(needs);
     };
     check();
     const obs = new ResizeObserver(check);
@@ -64,6 +81,14 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
     return () => obs.disconnect();
   }, [events]);
 
+  // Use layout effect to reset scroll before paint (prevents visual flash)
+  useLayoutEffect(() => {
+    if (!needsScroll && containerRef.current) {
+      containerRef.current.scrollTop = 0;
+    }
+    isDoubledRef.current = needsScroll;
+  }, [needsScroll]);
+
   useEffect(() => {
     if (!needsScroll || scrollSpeed === 0) return;
     const container = containerRef.current;
@@ -71,7 +96,6 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
 
     let animId: number;
     let lastTime: number | null = null;
-    // scrollSpeed is pixels per second
     const pxPerMs = scrollSpeed / 1000;
 
     const step = (time: number) => {
@@ -79,7 +103,6 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
         const dt = time - lastTime;
         container.scrollTop += pxPerMs * dt;
 
-        // When we've scrolled past the first set, jump back to create seamless loop
         const halfScroll = container.scrollHeight / 2;
         if (container.scrollTop >= halfScroll) {
           container.scrollTop -= halfScroll;

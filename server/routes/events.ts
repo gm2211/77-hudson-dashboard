@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import prisma from '../db.js';
-import { broadcast } from '../sse.js';
 import { addSoftDeleteRoutes } from './softDelete.js';
 
 const router = Router();
@@ -20,7 +19,6 @@ router.post('/', async (req, res) => {
     data: { ...rest, details: JSON.stringify(details || []) },
   });
   res.json(parseEventDetails(event));
-  broadcast();
 });
 
 router.put('/:id', async (req, res) => {
@@ -32,13 +30,11 @@ router.put('/:id', async (req, res) => {
     data,
   });
   res.json(parseEventDetails(event));
-  broadcast();
 });
 
 router.delete('/:id', async (req, res) => {
   await prisma.event.update({ where: { id: Number(req.params.id) }, data: { deletedAt: new Date() } });
   res.json({ ok: true });
-  broadcast();
 });
 
 export default router;

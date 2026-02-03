@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Service, Event, Advisory, BuildingConfig } from '../types';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
@@ -8,6 +8,12 @@ const api = {
   post: (url: string, body?: any) => fetch(url, { method: 'POST', headers: JSON_HEADERS, body: body ? JSON.stringify(body) : undefined }).then(r => r.json()),
   put: (url: string, body: any) => fetch(url, { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(body) }).then(r => r.json()),
   del: (url: string) => fetch(url, { method: 'DELETE' }).then(r => r.json()),
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  Operational: '#4caf50',
+  Maintenance: '#ffc107',
+  Outage: '#f44336',
 };
 
 function useTrash<T>(endpoint: string, onSave: () => void) {
@@ -24,6 +30,8 @@ export default function Admin() {
   const [events, setEvents] = useState<Event[]>([]);
   const [advisories, setAdvisories] = useState<Advisory[]>([]);
   const [config, setConfig] = useState<BuildingConfig | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const load = useCallback(() => {
     api.get('/api/services').then(setServices);
@@ -32,30 +40,92 @@ export default function Admin() {
     api.get('/api/config').then(setConfig);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  const checkDraft = useCallback(() => {
+    api.get('/api/draft-status').then(d => setHasChanges(d.hasChanges));
+  }, []);
+
+  const onSave = useCallback(() => {
+    load();
+    checkDraft();
+  }, [load, checkDraft]);
+
+  useEffect(() => { load(); checkDraft(); }, [load, checkDraft]);
+
+  const publish = async () => {
+    await api.post('/api/publish');
+    checkDraft();
+  };
+
+  const discard = async () => {
+    if (!confirm('Discard all unpublished changes?')) return;
+    await api.post('/api/discard');
+    onSave();
+  };
 
   return (
     <div style={styles.pageWrap}>
       <div style={styles.page}>
         <header style={styles.header}>
-          <h1>Hudson Dashboard — Admin</h1>
-          <a href="/" style={styles.link}>← View Dashboard</a>
+          <div>
+            <h1 style={{ margin: 0 }}>Hudson Dashboard — Admin</h1>
+            {hasChanges && <span style={{ color: '#ffc107', fontSize: '13px' }}>● Unpublished changes</span>}
+          </div>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button style={styles.headerBtn} onClick={publish}>Publish</button>
+            <button style={{ ...styles.headerBtn, ...styles.headerBtnSecondary }} onClick={discard}>Discard</button>
+            <button style={{ ...styles.headerBtn, ...styles.headerBtnSecondary }} onClick={() => setPreviewOpen(true)}>Preview</button>
+            <a href="/" style={styles.link}>← Dashboard</a>
+          </div>
         </header>
 
-        <ConfigSection config={config} onSave={load} />
-        <ServicesSection services={services} onSave={load} />
-        <EventsSection events={events} onSave={load} />
-        <AdvisoriesSection advisories={advisories} onSave={load} />
+        <ConfigSection config={config} onSave={onSave} />
+        <ServicesSection services={services} onSave={onSave} />
+        <EventsSection events={events} config={config} onSave={onSave} />
+        <AdvisoriesSection advisories={advisories} config={config} onSave={onSave} />
       </div>
+
+      {previewOpen && (
+        <div style={styles.modalOverlay} onClick={() => setPreviewOpen(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <strong style={{ color: '#e0e0e0' }}>Preview (Draft)</strong>
+              <button style={styles.smallBtn} onClick={() => setPreviewOpen(false)}>Close</button>
+            </div>
+            <iframe src="/?preview=true" style={{ width: '100%', height: '100%', border: 'none', borderRadius: '8px' }} />
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+          opacity: 1;
+          filter: invert(0.8);
+        }
+      `}</style>
     </div>
   );
 }
 
+function StatusSelect({ value, onChange, style }: { value: string; onChange: (v: string) => void; style?: React.CSSProperties }) {
+  return (
+    <select
+      style={{ ...styles.input, color: STATUS_COLORS[value] || '#e0e0e0', fontWeight: 600, ...style }}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+    >
+      <option value="Operational" style={{ color: STATUS_COLORS.Operational }}>Operational</option>
+      <option value="Maintenance" style={{ color: STATUS_COLORS.Maintenance }}>Maintenance</option>
+      <option value="Outage" style={{ color: STATUS_COLORS.Outage }}>Outage</option>
+    </select>
+  );
+}
+
 function ConfigSection({ config, onSave }: { config: BuildingConfig | null; onSave: () => void }) {
-  const [form, setForm] = useState({ buildingNumber: '', buildingName: '', subtitle: '', scrollSpeed: 30 });
+  const [form, setForm] = useState({ buildingNumber: '', buildingName: '', subtitle: '' });
 
   useEffect(() => {
-    if (config) setForm({ buildingNumber: config.buildingNumber, buildingName: config.buildingName, subtitle: config.subtitle, scrollSpeed: config.scrollSpeed });
+    if (config) setForm({ buildingNumber: config.buildingNumber, buildingName: config.buildingName, subtitle: config.subtitle });
   }, [config]);
 
   const save = async () => {
@@ -65,16 +135,11 @@ function ConfigSection({ config, onSave }: { config: BuildingConfig | null; onSa
 
   return (
     <section style={styles.section}>
-      <h2>Building Config</h2>
+      <h2 style={styles.sectionTitle}>Building Config</h2>
       <div style={styles.row}>
         <input style={styles.input} placeholder="Building #" value={form.buildingNumber} onChange={e => setForm({ ...form, buildingNumber: e.target.value })} />
         <input style={styles.input} placeholder="Building Name" value={form.buildingName} onChange={e => setForm({ ...form, buildingName: e.target.value })} />
         <input style={styles.input} placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
-        <label style={{ color: '#e0e0e0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          Scroll speed
-          <input style={{ ...styles.input, width: '60px' }} type="number" min="0" max="200" value={form.scrollSpeed} onChange={e => setForm({ ...form, scrollSpeed: Number(e.target.value) })} />
-          px/s
-        </label>
         <button style={styles.btn} onClick={save}>Save</button>
       </div>
     </section>
@@ -82,7 +147,7 @@ function ConfigSection({ config, onSave }: { config: BuildingConfig | null; onSa
 }
 
 function TrashSection<T extends { id: number }>({ type, items, labelFn, onReload }: { type: string; items: T[]; labelFn: (item: T) => string; onReload: () => void }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const restore = async (id: number) => {
     await api.post(`/api/${type}/${id}/restore`);
@@ -97,10 +162,14 @@ function TrashSection<T extends { id: number }>({ type, items, labelFn, onReload
   if (items.length === 0) return null;
 
   return (
-    <div style={{ marginTop: '12px' }}>
-      <button style={{ ...styles.smallBtn, background: '#555', marginLeft: 0 }} onClick={() => setOpen(!open)}>
-        {open ? '▾' : '▸'} Trash ({items.length})
-      </button>
+    <div style={{ marginTop: '16px', borderTop: '1px solid #1a3050', paddingTop: '12px' }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#888', fontSize: '13px', marginBottom: open ? '8px' : 0 }}
+        onClick={() => setOpen(!open)}
+      >
+        <span style={{ fontSize: '10px' }}>{open ? '▼' : '▶'}</span>
+        <span>Trash ({items.length})</span>
+      </div>
       {open && (
         <ul style={styles.list}>
           {items.map(item => (
@@ -130,30 +199,39 @@ function ServicesSection({ services, onSave }: { services: Service[]; onSave: ()
     reload();
   };
 
-  const toggle = async (s: Service) => {
-    const next = s.status === 'Operational' ? 'Maintenance' : s.status === 'Maintenance' ? 'Outage' : 'Operational';
-    await api.put(`/api/services/${s.id}`, { status: next });
+  const changeStatus = async (s: Service, newStatus: string) => {
+    await api.put(`/api/services/${s.id}`, { status: newStatus, lastChecked: new Date().toISOString() });
     onSave();
+  };
+
+  const setLastCheckedNow = async (s: Service) => {
+    await api.put(`/api/services/${s.id}`, { lastChecked: new Date().toISOString() });
+    onSave();
+  };
+
+  const formatLastChecked = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   };
 
   return (
     <section style={styles.section}>
-      <h2>Services</h2>
+      <h2 style={styles.sectionTitle}>Services</h2>
       <div style={styles.row}>
         <input style={styles.input} placeholder="Service name" value={name} onChange={e => setName(e.target.value)} />
-        <select style={styles.input} value={status} onChange={e => setStatus(e.target.value)}>
-          <option>Operational</option>
-          <option>Maintenance</option>
-          <option>Outage</option>
-        </select>
+        <StatusSelect value={status} onChange={setStatus} />
         <button style={styles.btn} onClick={add}>Add</button>
       </div>
       <ul style={styles.list}>
         {services.map(s => (
           <li key={s.id} style={styles.listItem}>
-            <span>{s.name}</span>
-            <span>
-              <button style={{ ...styles.smallBtn, background: s.status === 'Operational' ? '#4caf50' : s.status === 'Maintenance' ? '#ffc107' : '#f44336' }} onClick={() => toggle(s)}>{s.status}</button>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span>{s.name}</span>
+              <span style={{ fontSize: '11px', color: '#888' }}>Last: {formatLastChecked(s.lastChecked)}</span>
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button style={{ ...styles.smallBtn, background: '#555', fontSize: '10px' }} onClick={() => setLastCheckedNow(s)} title="Set last checked to now">⏱ Now</button>
+              <StatusSelect value={s.status} onChange={v => changeStatus(s, v)} style={{ padding: '4px 8px', fontSize: '12px' }} />
               <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => remove(s.id)}>✕</button>
             </span>
           </li>
@@ -174,6 +252,7 @@ function ImagePicker({ value, onChange }: { value: string; onChange: (v: string)
   const isPreset = IMAGE_PRESETS.some(p => p.url === value);
   const isCustom = !!value && !isPreset;
   const [showCustom, setShowCustom] = useState(isCustom);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const handleSelect = (v: string) => {
     if (v === '__custom__') {
@@ -188,6 +267,16 @@ function ImagePicker({ value, onChange }: { value: string; onChange: (v: string)
     }
   };
 
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.url) onChange(data.url);
+  };
+
   return (
     <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
       <select
@@ -200,9 +289,56 @@ function ImagePicker({ value, onChange }: { value: string; onChange: (v: string)
         <option value="__custom__">Custom URL...</option>
       </select>
       {showCustom && (
-        <input
-          style={{ ...styles.input, flex: 1 }}
-          placeholder="https://..."
+        <>
+          <input
+            style={{ ...styles.input, flex: 1 }}
+            placeholder="https://..."
+            value={value}
+            onChange={e => onChange(e.target.value)}
+          />
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleUpload} />
+          <button style={styles.smallBtn} onClick={() => fileRef.current?.click()}>Upload</button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function parseMarkdown(md: string): string {
+  return md
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/\n/g, '<br/>');
+}
+
+function MarkdownEditor({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const [showPreview, setShowPreview] = useState(false);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <span style={{ fontSize: '12px', color: '#888' }}>Details (markdown supported)</span>
+        <button
+          type="button"
+          style={{ ...styles.smallBtn, background: showPreview ? '#00838f' : '#555', marginLeft: 'auto' }}
+          onClick={() => setShowPreview(!showPreview)}
+        >
+          {showPreview ? 'Edit' : 'Preview'}
+        </button>
+      </div>
+      {showPreview ? (
+        <div
+          style={{ ...styles.input, minHeight: '100px', padding: '12px', lineHeight: 1.5, overflow: 'auto' }}
+          dangerouslySetInnerHTML={{ __html: parseMarkdown(value) || '<span style="color:#666">Nothing to preview</span>' }}
+        />
+      ) : (
+        <textarea
+          style={{ ...styles.input, height: '100px', fontFamily: 'monospace', fontSize: '13px' }}
+          placeholder={placeholder || "**Bold**, *italic*, `code`\nEach line becomes a detail bullet"}
           value={value}
           onChange={e => onChange(e.target.value)}
         />
@@ -211,47 +347,92 @@ function ImagePicker({ value, onChange }: { value: string; onChange: (v: string)
   );
 }
 
-function EventsSection({ events, onSave }: { events: Event[]; onSave: () => void }) {
-  const empty = { title: '', subtitle: '', details: '' as string, imageUrl: '', accentColor: '#00bcd4' };
+function EventsSection({ events, config, onSave }: { events: Event[]; config: BuildingConfig | null; onSave: () => void }) {
+  const empty = { title: '', subtitle: '', details: '' as string, imageUrl: '' };
   const [form, setForm] = useState(empty);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [scrollSpeed, setScrollSpeed] = useState(config?.scrollSpeed ?? 30);
   const { trash, reload, remove } = useTrash<Event>('/api/events', onSave);
 
-  const add = async () => {
+  useEffect(() => {
+    if (config) setScrollSpeed(config.scrollSpeed);
+  }, [config]);
+
+  const saveScrollSpeed = async (val: number) => {
+    setScrollSpeed(val);
+    await api.put('/api/config', { scrollSpeed: val });
+    onSave();
+  };
+
+  const submit = async () => {
     if (!form.title) return;
-    await api.post('/api/events', {
+    const body = {
       title: form.title,
       subtitle: form.subtitle,
       details: form.details.split('\n').filter(Boolean),
       imageUrl: form.imageUrl,
-      accentColor: form.accentColor,
       sortOrder: events.length,
-    });
+    };
+    if (editingId) {
+      await api.put(`/api/events/${editingId}`, body);
+    } else {
+      await api.post('/api/events', body);
+    }
     setForm(empty);
+    setEditingId(null);
     reload();
+  };
+
+  const startEdit = (e: Event) => {
+    setEditingId(e.id);
+    setForm({
+      title: e.title,
+      subtitle: e.subtitle,
+      details: (e.details || []).join('\n'),
+      imageUrl: e.imageUrl,
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setForm(empty);
   };
 
   return (
     <section style={styles.section}>
-      <h2>Events</h2>
+      <h2 style={styles.sectionTitle}>Events</h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
         <div style={styles.row}>
-          <input style={styles.input} placeholder="Title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
-          <input style={styles.input} placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
-          <input style={{ ...styles.input, width: '80px' }} type="color" value={form.accentColor} onChange={e => setForm({ ...form, accentColor: e.target.value })} />
+          <input style={{ ...styles.input, flex: 1 }} placeholder="Title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+          <input style={{ ...styles.input, flex: 1 }} placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
         </div>
         <ImagePicker value={form.imageUrl} onChange={imageUrl => setForm({ ...form, imageUrl })} />
-        <textarea style={{ ...styles.input, height: '60px' }} placeholder="Details (one per line)" value={form.details} onChange={e => setForm({ ...form, details: e.target.value })} />
-        <button style={styles.btn} onClick={add}>Add Event</button>
+        <MarkdownEditor key={editingId ?? 'new'} value={form.details} onChange={details => setForm({ ...form, details })} />
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button style={styles.btn} onClick={submit}>{editingId ? 'Save' : 'Add Event'}</button>
+          {editingId && <button style={{ ...styles.btn, background: '#555' }} onClick={cancelEdit}>Cancel</button>}
+        </div>
       </div>
       <ul style={styles.list}>
         {events.map(e => (
           <li key={e.id} style={styles.listItem}>
             <span><strong>{e.title}</strong> — {e.subtitle}</span>
-            <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => remove(e.id)}>✕</button>
+            <span style={{ display: 'flex', gap: '4px' }}>
+              <button style={{ ...styles.smallBtn, background: '#1976d2' }} onClick={() => startEdit(e)}>✎</button>
+              <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => remove(e.id)}>✕</button>
+            </span>
           </li>
         ))}
       </ul>
       <TrashSection type="events" items={trash} labelFn={e => e.title} onReload={reload} />
+
+      <div style={{ marginTop: '16px', borderTop: '1px solid #1a3050', paddingTop: '12px' }}>
+        <label style={{ color: '#e0e0e0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          Scroll speed
+          <input style={{ ...styles.input, width: '70px' }} type="number" min="0" max="200" value={scrollSpeed} onChange={e => saveScrollSpeed(Number(e.target.value))} />
+          px/s
+        </label>
+      </div>
     </section>
   );
 }
@@ -267,43 +448,51 @@ const ADVISORY_PRESETS = [
 
 function LabelPicker({ value, onChange, style }: { value: string; onChange: (v: string) => void; style?: React.CSSProperties }) {
   const isCustom = !ADVISORY_PRESETS.includes(value);
-  const [custom, setCustom] = useState(isCustom);
 
   const handleSelect = (v: string) => {
     if (v === '__custom__') {
-      setCustom(true);
       onChange('');
     } else {
-      setCustom(false);
       onChange(v);
     }
   };
 
-  if (custom) {
-    return (
-      <div style={{ display: 'flex', gap: '4px', ...style }}>
+  return (
+    <div style={{ display: 'flex', gap: '4px', ...style }}>
+      <select
+        style={{ ...styles.input, fontWeight: 700, flex: 1 }}
+        value={isCustom ? '__custom__' : value}
+        onChange={e => handleSelect(e.target.value)}
+      >
+        {ADVISORY_PRESETS.map(p => <option key={p} value={p}>{p}</option>)}
+        <option value="__custom__">+ Custom...</option>
+      </select>
+      {isCustom && (
         <input
           style={{ ...styles.input, flex: 1, fontWeight: 700 }}
           placeholder="Custom label"
           value={value}
           onChange={e => onChange(e.target.value)}
         />
-        <button style={{ ...styles.smallBtn, background: '#555' }} onClick={() => { setCustom(false); onChange(ADVISORY_PRESETS[0]); }}>✕</button>
-      </div>
-    );
-  }
-
-  return (
-    <select style={{ ...styles.input, fontWeight: 700, ...style }} value={value} onChange={e => handleSelect(e.target.value)}>
-      {ADVISORY_PRESETS.map(p => <option key={p} value={p}>{p}</option>)}
-      <option value="__custom__">+ Custom...</option>
-    </select>
+      )}
+    </div>
   );
 }
 
-function AdvisoriesSection({ advisories, onSave }: { advisories: Advisory[]; onSave: () => void }) {
+function AdvisoriesSection({ advisories, config, onSave }: { advisories: Advisory[]; config: BuildingConfig | null; onSave: () => void }) {
   const [form, setForm] = useState({ label: ADVISORY_PRESETS[0], message: '' });
+  const [tickerSpeed, setTickerSpeed] = useState(config?.tickerSpeed ?? 25);
   const { trash, reload, remove } = useTrash<Advisory>('/api/advisories', onSave);
+
+  useEffect(() => {
+    if (config) setTickerSpeed(config.tickerSpeed);
+  }, [config]);
+
+  const saveTickerSpeed = async (val: number) => {
+    setTickerSpeed(val);
+    await api.put('/api/config', { tickerSpeed: val });
+    onSave();
+  };
 
   const add = async () => {
     if (!form.message) return;
@@ -324,7 +513,7 @@ function AdvisoriesSection({ advisories, onSave }: { advisories: Advisory[]; onS
 
   return (
     <section style={styles.section}>
-      <h2>Advisories</h2>
+      <h2 style={styles.sectionTitle}>Advisories</h2>
       <div style={styles.row}>
         <LabelPicker style={{ width: '200px' }} value={form.label} onChange={label => setForm({ ...form, label })} />
         <input style={{ ...styles.input, flex: 1 }} placeholder="Message" value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} />
@@ -343,6 +532,14 @@ function AdvisoriesSection({ advisories, onSave }: { advisories: Advisory[]; onS
         ))}
       </ul>
       <TrashSection type="advisories" items={trash} labelFn={a => `${a.label}: ${a.message}`} onReload={reload} />
+
+      <div style={{ marginTop: '16px', borderTop: '1px solid #1a3050', paddingTop: '12px' }}>
+        <label style={{ color: '#e0e0e0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          Ticker scroll duration
+          <input style={{ ...styles.input, width: '70px' }} type="number" min="0" max="120" value={tickerSpeed} onChange={e => saveTickerSpeed(Number(e.target.value))} />
+          seconds (0 = stopped)
+        </label>
+      </div>
     </section>
   );
 }
@@ -351,12 +548,31 @@ const styles: Record<string, React.CSSProperties> = {
   pageWrap: { background: '#0a1628', minHeight: '100vh' },
   page: { maxWidth: '900px', margin: '0 auto', padding: '24px', color: '#e0e0e0' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #1a3050', paddingBottom: '16px' },
-  link: { color: '#00bcd4', textDecoration: 'none' },
+  link: { color: '#00bcd4', textDecoration: 'none', fontSize: '14px' },
   section: { background: '#132038', borderRadius: '12px', border: '1px solid #1a3050', padding: '20px', marginBottom: '20px' },
+  sectionTitle: { margin: '0 0 12px' },
   row: { display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' },
   input: { background: '#0a1628', border: '1px solid #1a3050', borderRadius: '6px', padding: '8px 12px', color: '#e0e0e0', fontSize: '14px' },
   btn: { background: '#00838f', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 16px', cursor: 'pointer', fontWeight: 600 },
+  headerBtn: {
+    background: 'linear-gradient(135deg, #1a5a3a 0%, #0d3d28 100%)',
+    color: '#a8e6cf',
+    border: '1px solid #2a7a5a',
+    borderRadius: '6px',
+    padding: '8px 16px',
+    cursor: 'pointer',
+    fontWeight: 600,
+    fontSize: '13px',
+    minWidth: '80px',
+  },
+  headerBtnSecondary: {
+    background: 'linear-gradient(135deg, #1a3050 0%, #0d1f35 100%)',
+    color: '#8ab4d4',
+    border: '1px solid #2a4060',
+  },
   smallBtn: { border: 'none', borderRadius: '4px', padding: '4px 10px', color: '#fff', cursor: 'pointer', fontSize: '12px', marginLeft: '6px' },
   list: { listStyle: 'none', padding: 0 },
   listItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #1a3050' },
+  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  modal: { width: '90vw', height: '85vh', background: '#132038', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column' },
 };

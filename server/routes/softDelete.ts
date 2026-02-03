@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { broadcast } from '../sse.js';
 
 /**
  * Adds soft-delete routes (GET /trash, POST /:id/restore, DELETE /:id/purge)
@@ -15,12 +14,10 @@ export function addSoftDeleteRoutes(router: Router, model: any, transform?: (ite
   router.post('/:id/restore', async (req: any, res: any) => {
     await model.update({ where: { id: Number(req.params.id) }, data: { deletedAt: null } });
     res.json({ ok: true });
-    broadcast();
   });
 
   router.delete('/:id/purge', async (req: any, res: any) => {
     await model.delete({ where: { id: Number(req.params.id) } });
     res.json({ ok: true });
-    broadcast();
   });
 }

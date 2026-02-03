@@ -1,17 +1,32 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import multer from 'multer';
+import fs from 'fs';
 
 import servicesRouter from './routes/services.js';
 import eventsRouter from './routes/events.js';
 import advisoriesRouter from './routes/advisories.js';
 import configRouter from './routes/config.js';
+import publishRouter from './routes/publish.js';
 import prisma from './db.js';
 import { sseHandler } from './sse.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+const uploadDir = path.resolve(__dirname, '../public/images/uploads');
+fs.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
+  },
+});
+const upload = multer({ storage });
 
 app.use(express.json());
 
@@ -22,6 +37,12 @@ app.use('/api/services', servicesRouter);
 app.use('/api/events', eventsRouter);
 app.use('/api/advisories', advisoriesRouter);
 app.use('/api/config', configRouter);
+app.use('/api', publishRouter);
+
+app.post('/api/upload', upload.single('file'), (req: any, res: any) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  res.json({ url: `/images/uploads/${req.file.filename}` });
+});
 
 async function seedIfEmpty() {
   const count = await prisma.service.count();
@@ -88,8 +109,28 @@ async function seedIfEmpty() {
   });
 }
 
+async function seedSnapshot() {
+  const count = await prisma.publishedSnapshot.count();
+  if (count > 0) return;
+
+  const [services, events, advisories, config] = await Promise.all([
+    prisma.service.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } }),
+    prisma.event.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } }),
+    prisma.advisory.findMany({ where: { deletedAt: null } }),
+    prisma.buildingConfig.findFirst(),
+  ]);
+  const data = {
+    services,
+    events: events.map(e => ({ ...e, details: JSON.parse(e.details) })),
+    advisories,
+    config,
+  };
+  await prisma.publishedSnapshot.create({ data: { data: JSON.stringify(data) } });
+}
+
 async function start() {
   await seedIfEmpty();
+  await seedSnapshot();
 
   if (process.env.NODE_ENV === 'production') {
     const distPath = path.resolve(__dirname, '../dist');

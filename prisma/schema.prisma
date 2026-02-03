@@ -41,4 +41,11 @@ model BuildingConfig {
   buildingName   String @default("Hudson Dashboard")
   subtitle       String @default("Real-time System Monitor")
   scrollSpeed    Int    @default(30)
+  tickerSpeed    Int    @default(25)
+}
+
+model PublishedSnapshot {
+  id          Int      @id @default(autoincrement())
+  data        String
+  publishedAt DateTime @default(now())
 }

@@ -29,4 +29,5 @@ export interface BuildingConfig {
   buildingName: string;
   subtitle: string;
   scrollSpeed: number;
+  tickerSpeed: number;
 }

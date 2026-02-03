@@ -1,6 +1,6 @@
 import type { Advisory } from '../types';
 
-export default function AdvisoryTicker({ advisories }: { advisories: Advisory[] }) {
+export default function AdvisoryTicker({ advisories, tickerSpeed = 25 }: { advisories: Advisory[]; tickerSpeed?: number }) {
   const active = advisories.filter(a => a.active);
   if (active.length === 0) return null;
 
@@ -11,10 +11,15 @@ export default function AdvisoryTicker({ advisories }: { advisories: Advisory[] 
     </span>
   ));
 
+  const duration = tickerSpeed > 0 ? `${tickerSpeed}s` : '0s';
+  const animationStyle = tickerSpeed > 0
+    ? { animation: `ticker-scroll ${duration} linear infinite` }
+    : { animation: 'none' };
+
   return (
     <div style={styles.ticker}>
       <div style={styles.track}>
-        <div style={styles.scroll}>
+        <div style={{ ...styles.scroll, ...animationStyle }}>
           {labels}
           {labels}
         </div>
@@ -43,7 +48,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'inline-flex',
     alignItems: 'center',
     whiteSpace: 'nowrap',
-    animation: 'ticker-scroll 25s linear infinite',
   },
   segment: {
     display: 'inline-flex',
