@@ -28,6 +28,13 @@ router.get('/published', async (_req, res) => {
 });
 
 router.post('/publish', async (_req, res) => {
+  // Actually delete items marked for deletion
+  await prisma.$transaction([
+    prisma.service.updateMany({ where: { markedForDeletion: true }, data: { deletedAt: new Date(), markedForDeletion: false } }),
+    prisma.event.updateMany({ where: { markedForDeletion: true }, data: { deletedAt: new Date(), markedForDeletion: false } }),
+    prisma.advisory.updateMany({ where: { markedForDeletion: true }, data: { deletedAt: new Date(), markedForDeletion: false } }),
+  ]);
+
   const state = await getCurrentState();
   await prisma.publishedSnapshot.deleteMany();
   await prisma.publishedSnapshot.create({ data: { data: JSON.stringify(state) } });
@@ -49,7 +56,7 @@ router.post('/discard', async (_req, res) => {
     if (data.services?.length) {
       await tx.service.createMany({
         data: data.services.map((s: any) => ({
-          id: s.id, name: s.name, status: s.status, sortOrder: s.sortOrder, lastChecked: new Date(s.lastChecked),
+          id: s.id, name: s.name, status: s.status, notes: s.notes || '', sortOrder: s.sortOrder, lastChecked: new Date(s.lastChecked),
         })),
       });
     }
@@ -79,6 +86,7 @@ router.post('/discard', async (_req, res) => {
             buildingName: data.config.buildingName,
             subtitle: data.config.subtitle,
             scrollSpeed: data.config.scrollSpeed,
+            tickerSpeed: data.config.tickerSpeed,
           },
         });
       }
@@ -111,14 +119,35 @@ router.get('/draft-status', async (_req, res) => {
     };
   })();
 
-  const eventsChanged = JSON.stringify(current.events) !== JSON.stringify(published.events);
-  const advisoriesChanged = JSON.stringify(current.advisories) !== JSON.stringify(published.advisories);
+  // Check for items marked for deletion (these are always changes)
+  const hasMarkedServices = current.services.some((s: any) => s.markedForDeletion);
+  const hasMarkedEvents = current.events.some((e: any) => e.markedForDeletion);
+  const hasMarkedAdvisories = current.advisories.some((a: any) => a.markedForDeletion);
+
+  // Normalize services comparison to handle notes field that might be missing from old snapshots
+  const normalizeService = (s: any) => ({
+    id: s.id,
+    name: s.name,
+    status: s.status,
+    notes: s.notes || '',
+    lastChecked: s.lastChecked,
+    sortOrder: s.sortOrder,
+  });
+  const currentServicesNormalized = current.services.filter((s: any) => !s.markedForDeletion).map(normalizeService);
+  const publishedServicesNormalized = (published.services || []).map(normalizeService);
+
+  // For events/advisories, filter out marked items before comparing
+  const currentEventsFiltered = current.events.filter((e: any) => !e.markedForDeletion);
+  const currentAdvisoriesFiltered = current.advisories.filter((a: any) => !a.markedForDeletion);
+
+  const eventsChanged = JSON.stringify(currentEventsFiltered) !== JSON.stringify(published.events);
+  const advisoriesChanged = JSON.stringify(currentAdvisoriesFiltered) !== JSON.stringify(published.advisories);
 
   const sectionChanges = {
     config: configFields.buildingChanged,
-    services: JSON.stringify(current.services) !== JSON.stringify(published.services),
-    events: eventsChanged || configFields.scrollSpeedChanged,
-    advisories: advisoriesChanged || configFields.tickerSpeedChanged,
+    services: hasMarkedServices || JSON.stringify(currentServicesNormalized) !== JSON.stringify(publishedServicesNormalized),
+    events: hasMarkedEvents || eventsChanged || configFields.scrollSpeedChanged,
+    advisories: hasMarkedAdvisories || advisoriesChanged || configFields.tickerSpeedChanged,
   };
 
   const hasChanges = Object.values(sectionChanges).some(Boolean);

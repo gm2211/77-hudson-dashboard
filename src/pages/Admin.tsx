@@ -111,8 +111,8 @@ export default function Admin() {
 
         <ConfigSection config={config} onSave={onSave} hasChanged={sectionChanges.config} />
         <ServicesSection services={services} onSave={onSave} hasChanged={sectionChanges.services} publishedServices={published?.services || null} />
-        <EventsSection events={events} config={config} onSave={onSave} hasChanged={sectionChanges.events} />
-        <AdvisoriesSection advisories={advisories} config={config} onSave={onSave} hasChanged={sectionChanges.advisories} />
+        <EventsSection events={events} config={config} onSave={onSave} hasChanged={sectionChanges.events} publishedEvents={published?.events || null} />
+        <AdvisoriesSection advisories={advisories} config={config} onSave={onSave} hasChanged={sectionChanges.advisories} publishedAdvisories={published?.advisories || null} />
       </div>
 
       {previewOpen && (
@@ -243,6 +243,8 @@ function TrashSection<T extends { id: number }>({ type, items, labelFn, onReload
 function ServicesSection({ services, onSave, hasChanged, publishedServices }: { services: Service[]; onSave: () => void; hasChanged: boolean; publishedServices: Service[] | null }) {
   const [name, setName] = useState('');
   const [status, setStatus] = useState('Operational');
+  const [expandedNotes, setExpandedNotes] = useState<number | null>(null);
+  const [editingNotes, setEditingNotes] = useState<Record<number, string>>({});
   const { trash, reload, remove } = useTrash<Service>('/api/services', onSave);
 
   const add = async () => {
@@ -252,8 +254,23 @@ function ServicesSection({ services, onSave, hasChanged, publishedServices }: { 
     reload();
   };
 
+  const markForDeletion = async (id: number) => {
+    await api.del(`/api/services/${id}`);
+    onSave();
+  };
+
+  const unmarkForDeletion = async (id: number) => {
+    await api.post(`/api/services/${id}/unmark`);
+    onSave();
+  };
+
   const changeStatus = async (s: Service, newStatus: string) => {
     await api.put(`/api/services/${s.id}`, { status: newStatus, lastChecked: new Date().toISOString() });
+    onSave();
+  };
+
+  const updateNotes = async (s: Service, notes: string) => {
+    await api.put(`/api/services/${s.id}`, { notes });
     onSave();
   };
 
@@ -285,31 +302,107 @@ function ServicesSection({ services, onSave, hasChanged, publishedServices }: { 
           <button style={styles.btn} onClick={add}>Add Service to Draft</button>
         </div>
       </div>
+      {services.length > 0 && (
+        <div style={styles.listHeader}>
+          <span>Current Services</span>
+          <span style={{ fontSize: '11px', color: '#666' }}>{services.length} item{services.length !== 1 ? 's' : ''}</span>
+        </div>
+      )}
       <div>
         {services.map(s => {
           const pub = getPublishedService(s.id);
+          const isNewDraft = !pub;
+          const isMarkedForDeletion = s.markedForDeletion;
           const statusChanged = pub && pub.status !== s.status;
           const timeChanged = pub && pub.lastChecked !== s.lastChecked;
+          const notesChanged = pub && (s.notes || '') !== (pub.notes || '');
+          const isExpanded = expandedNotes === s.id && !isMarkedForDeletion;
 
           return (
-            <div key={s.id} style={styles.listCard}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontWeight: 500 }}>{s.name}</span>
-                <span style={{ fontSize: '11px', color: '#888' }}>
-                  Last: {formatLastChecked(s.lastChecked)}
-                  {timeChanged && (
-                    <span style={styles.changedValue}> was {formatLastChecked(pub.lastChecked)}</span>
-                  )}
-                </span>
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <button style={{ ...styles.smallBtn, background: '#555', fontSize: '10px' }} onClick={() => setLastCheckedNow(s)} title="Mark as just checked">Just Checked</button>
-                {statusChanged && (
-                  <span style={{ fontSize: '10px', opacity: 0.8, color: STATUS_COLORS[pub.status] }}>{pub.status} →</span>
+            <div key={s.id} style={{ ...styles.listCard, ...(isMarkedForDeletion ? styles.markedForDeletion : {}) }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '12px', ...(isMarkedForDeletion ? { textDecoration: 'line-through', opacity: 0.5 } : {}) }}>
+                    {isNewDraft && !isMarkedForDeletion && <span style={styles.draftIndicator} title="New draft item">●</span>}
+                    {isMarkedForDeletion && <span style={{ color: '#f44336', fontSize: '10px' }} title="Will be deleted on publish">🗑</span>}
+                    <span style={{ fontWeight: 500 }}>{s.name}</span>
+                    <span style={{ fontSize: '11px', color: '#888' }}>
+                      Last: {formatLastChecked(s.lastChecked)}
+                      {timeChanged && !isMarkedForDeletion && (
+                        <span style={styles.changedValue}> was {formatLastChecked(pub.lastChecked)}</span>
+                      )}
+                    </span>
+                    {s.notes && !isExpanded && (
+                      <span style={{ fontSize: '10px', color: '#666', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        "{s.notes}"
+                      </span>
+                    )}
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {isMarkedForDeletion ? (
+                      <button style={{ ...styles.smallBtn, background: '#4caf50' }} onClick={() => unmarkForDeletion(s.id)}>Undo</button>
+                    ) : (
+                      <>
+                        <button
+                          style={{ ...styles.smallBtn, background: isExpanded ? '#00838f' : '#444', fontSize: '10px' }}
+                          onClick={() => setExpandedNotes(isExpanded ? null : s.id)}
+                          title={s.notes ? 'Edit note' : 'Add note'}
+                        >
+                          {s.notes ? '📝' : '+ Note'}
+                        </button>
+                        <button style={{ ...styles.smallBtn, background: '#555', fontSize: '10px' }} onClick={() => setLastCheckedNow(s)} title="Mark as just checked">Just Checked</button>
+                        {statusChanged && (
+                          <span style={{ fontSize: '10px', opacity: 0.8, color: STATUS_COLORS[pub.status] }}>{pub.status} →</span>
+                        )}
+                        <StatusSelect value={s.status} onChange={v => changeStatus(s, v)} style={{ padding: '4px 8px', fontSize: '12px' }} />
+                        <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => markForDeletion(s.id)}>✕</button>
+                      </>
+                    )}
+                  </span>
+                </div>
+                {isExpanded && (
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      style={{ ...styles.input, flex: 1, fontSize: '12px', padding: '6px 10px' }}
+                      placeholder="Add a note about this service status..."
+                      value={editingNotes[s.id] ?? s.notes ?? ''}
+                      onChange={e => setEditingNotes({ ...editingNotes, [s.id]: e.target.value })}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          const newNotes = editingNotes[s.id] ?? s.notes ?? '';
+                          if (newNotes !== (s.notes || '')) {
+                            updateNotes(s, newNotes);
+                            setEditingNotes(prev => { const copy = { ...prev }; delete copy[s.id]; return copy; });
+                          }
+                          setExpandedNotes(null);
+                        }
+                      }}
+                      autoFocus
+                    />
+                    <button
+                      style={{ ...styles.smallBtn, background: '#00838f' }}
+                      onClick={() => {
+                        const newNotes = editingNotes[s.id] ?? s.notes ?? '';
+                        updateNotes(s, newNotes);
+                        setEditingNotes(prev => { const copy = { ...prev }; delete copy[s.id]; return copy; });
+                        setExpandedNotes(null);
+                      }}
+                    >
+                      Save
+                    </button>
+                    <button
+                      style={{ ...styles.smallBtn, background: '#555' }}
+                      onClick={() => {
+                        setEditingNotes(prev => { const copy = { ...prev }; delete copy[s.id]; return copy; });
+                        setExpandedNotes(null);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    {notesChanged && <span style={{ fontSize: '10px', color: '#ffc107' }}>changed</span>}
+                  </div>
                 )}
-                <StatusSelect value={s.status} onChange={v => changeStatus(s, v)} style={{ padding: '4px 8px', fontSize: '12px' }} />
-                <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => remove(s.id)}>✕</button>
-              </span>
+              </div>
             </div>
           );
         })}
@@ -469,8 +562,9 @@ function EventCardPreview({ title, subtitle, imageUrl, details }: CardPreviewDat
     background: imageUrl
       ? `linear-gradient(to right, rgba(20,60,58,0.92) 0%, rgba(20,60,58,0.75) 50%, rgba(20,60,58,0.3) 100%), url(${imageUrl})`
       : 'linear-gradient(135deg, #1a5c5a 0%, #1a4a48 100%)',
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
+    backgroundSize: imageUrl ? '100% 100%, cover' : undefined,
+    backgroundPosition: imageUrl ? 'center, center' : undefined,
+    backgroundRepeat: 'no-repeat',
     borderRadius: '12px',
     overflow: 'hidden',
     border: '1px solid rgba(255,255,255,0.1)',
@@ -606,22 +700,34 @@ function MarkdownEditor({ value, onChange, placeholder, cardPreview }: { value: 
   );
 }
 
-function EventsSection({ events, config, onSave, hasChanged }: { events: Event[]; config: BuildingConfig | null; onSave: () => void; hasChanged: boolean }) {
+function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: { events: Event[]; config: BuildingConfig | null; onSave: () => void; hasChanged: boolean; publishedEvents: Event[] | null }) {
   const empty = { title: '', subtitle: '', details: '' as string, imageUrl: '' };
   const [form, setForm] = useState(empty);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [previewEvent, setPreviewEvent] = useState<Event | null>(null);
-  const [scrollSpeed, setScrollSpeed] = useState(config?.scrollSpeed ?? 30);
+  const [previewingForm, setPreviewingForm] = useState(false);
+  const [scrollSpeedText, setScrollSpeedText] = useState(String(config?.scrollSpeed ?? 30));
   const [errors, setErrors] = useState<{ title?: boolean }>({});
   const [shake, setShake] = useState(false);
   const { trash, reload, remove } = useTrash<Event>('/api/events', onSave);
 
+  const markForDeletion = async (id: number) => {
+    await api.del(`/api/events/${id}`);
+    onSave();
+  };
+
+  const unmarkForDeletion = async (id: number) => {
+    await api.post(`/api/events/${id}/unmark`);
+    onSave();
+  };
+
   useEffect(() => {
-    if (config) setScrollSpeed(config.scrollSpeed);
+    if (config) setScrollSpeedText(String(config.scrollSpeed));
   }, [config]);
 
-  const saveScrollSpeed = async (val: number) => {
-    setScrollSpeed(val);
+  const saveScrollSpeed = async (text: string) => {
+    const val = text === '' ? 0 : Math.max(0, Math.min(120, Number(text)));
+    setScrollSpeedText(String(val));
     await api.put('/api/config', { scrollSpeed: val });
     onSave();
   };
@@ -700,41 +806,78 @@ function EventsSection({ events, config, onSave, hasChanged }: { events: Event[]
           />
           <div style={{ display: 'flex', gap: '8px' }}>
             <button style={styles.btn} onClick={submit}>{editingId ? 'Save Draft' : 'Add Event to Draft'}</button>
+            <button style={{ ...styles.btn, background: '#00838f' }} onClick={() => setPreviewingForm(true)}>Preview</button>
             {editingId && <button style={{ ...styles.btn, background: '#555' }} onClick={cancelEdit}>Cancel</button>}
           </div>
         </div>
       </div>
-      <div>
-        {events.map(e => (
-          <div key={e.id} style={styles.listCard}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-              {e.imageUrl && (
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '6px',
-                  backgroundImage: `url(${e.imageUrl})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  flexShrink: 0,
-                }} />
-              )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-                <span style={{ fontWeight: 600, color: '#fff' }}>{e.title}</span>
-                <span style={{ fontSize: '12px', color: '#888' }}>{e.subtitle}</span>
-                <span style={{ fontSize: '10px', color: '#666' }}>
-                  {e.details.length} detail{e.details.length !== 1 ? 's' : ''}
-                  {e.imageUrl && ' • has image'}
-                </span>
-              </div>
-            </div>
-            <span style={{ display: 'flex', gap: '4px' }}>
-              <button style={{ ...styles.smallBtn, background: '#00838f', fontSize: '10px' }} onClick={() => setPreviewEvent(e)}>Preview</button>
-              <button style={{ ...styles.smallBtn, background: '#1976d2' }} onClick={() => startEdit(e)} title="Edit">✎</button>
-              <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => remove(e.id)} title="Delete">✕</button>
-            </span>
+
+      {previewingForm && (
+        <div style={styles.modalOverlay} onClick={() => setPreviewingForm(false)}>
+          <div onClick={ev => ev.stopPropagation()} style={{ position: 'relative' }}>
+            <EventCardPreview
+              title={form.title || 'Untitled Event'}
+              subtitle={form.subtitle}
+              imageUrl={form.imageUrl}
+              details={form.details}
+            />
+            <button
+              style={{ ...styles.smallBtn, position: 'absolute', top: '-8px', right: '-8px', background: '#555' }}
+              onClick={() => setPreviewingForm(false)}
+            >✕</button>
           </div>
-        ))}
+        </div>
+      )}
+
+      {events.length > 0 && (
+        <div style={styles.listHeader}>
+          <span>Current Events</span>
+          <span style={{ fontSize: '11px', color: '#666' }}>{events.length} item{events.length !== 1 ? 's' : ''}</span>
+        </div>
+      )}
+      <div>
+        {events.map(e => {
+          const isNewDraft = !publishedEvents?.find(pe => pe.id === e.id);
+          const isMarkedForDeletion = e.markedForDeletion;
+          return (
+            <div key={e.id} style={{ ...styles.listCard, ...(isMarkedForDeletion ? styles.markedForDeletion : {}) }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, ...(isMarkedForDeletion ? { textDecoration: 'line-through', opacity: 0.5 } : {}) }}>
+                {isNewDraft && !isMarkedForDeletion && <span style={styles.draftIndicator} title="New draft item">●</span>}
+                {isMarkedForDeletion && <span style={{ color: '#f44336', fontSize: '10px' }} title="Will be deleted on publish">🗑</span>}
+                {e.imageUrl && (
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '6px',
+                    backgroundImage: `url(${e.imageUrl})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    flexShrink: 0,
+                  }} />
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                  <span style={{ fontWeight: 600, color: '#fff' }}>{e.title}</span>
+                  <span style={{ fontSize: '12px', color: '#888' }}>{e.subtitle}</span>
+                  <span style={{ fontSize: '10px', color: '#666' }}>
+                    {e.details.length} detail{e.details.length !== 1 ? 's' : ''}
+                    {e.imageUrl && ' • has image'}
+                  </span>
+                </div>
+              </div>
+              <span style={{ display: 'flex', gap: '4px' }}>
+                {isMarkedForDeletion ? (
+                  <button style={{ ...styles.smallBtn, background: '#4caf50' }} onClick={() => unmarkForDeletion(e.id)}>Undo</button>
+                ) : (
+                  <>
+                    <button style={{ ...styles.smallBtn, background: '#00838f', fontSize: '10px' }} onClick={() => setPreviewEvent(e)}>Preview</button>
+                    <button style={{ ...styles.smallBtn, background: '#1976d2' }} onClick={() => startEdit(e)} title="Edit">✎</button>
+                    <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => markForDeletion(e.id)} title="Delete">✕</button>
+                  </>
+                )}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       {previewEvent && (
@@ -758,7 +901,18 @@ function EventsSection({ events, config, onSave, hasChanged }: { events: Event[]
       <div style={{ marginTop: '12px' }}>
         <label style={{ color: '#e0e0e0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           Scroll duration
-          <input style={{ ...styles.input, width: '70px' }} type="number" min="0" max="120" value={scrollSpeed} onChange={e => saveScrollSpeed(Number(e.target.value))} />
+          <input
+            style={{ ...styles.input, width: '70px' }}
+            type="number"
+            min="0"
+            max="120"
+            value={scrollSpeedText}
+            onChange={e => {
+              setScrollSpeedText(e.target.value);
+              saveScrollSpeed(e.target.value);
+            }}
+            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+          />
           seconds (0 = stopped)
         </label>
       </div>
@@ -808,17 +962,30 @@ function LabelPicker({ value, onChange, style }: { value: string; onChange: (v: 
   );
 }
 
-function AdvisoriesSection({ advisories, config, onSave, hasChanged }: { advisories: Advisory[]; config: BuildingConfig | null; onSave: () => void; hasChanged: boolean }) {
+function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAdvisories }: { advisories: Advisory[]; config: BuildingConfig | null; onSave: () => void; hasChanged: boolean; publishedAdvisories: Advisory[] | null }) {
   const [form, setForm] = useState({ label: ADVISORY_PRESETS[0], message: '' });
-  const [tickerSpeed, setTickerSpeed] = useState(config?.tickerSpeed ?? 25);
+  const [tickerSpeedText, setTickerSpeedText] = useState(String(config?.tickerSpeed ?? 25));
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ label: '', message: '' });
   const { trash, reload, remove } = useTrash<Advisory>('/api/advisories', onSave);
 
   useEffect(() => {
-    if (config) setTickerSpeed(config.tickerSpeed);
+    if (config) setTickerSpeedText(String(config.tickerSpeed));
   }, [config]);
 
-  const saveTickerSpeed = async (val: number) => {
-    setTickerSpeed(val);
+  const markForDeletion = async (id: number) => {
+    await api.del(`/api/advisories/${id}`);
+    onSave();
+  };
+
+  const unmarkForDeletion = async (id: number) => {
+    await api.post(`/api/advisories/${id}/unmark`);
+    onSave();
+  };
+
+  const saveTickerSpeed = async (text: string) => {
+    const val = text === '' ? 0 : Math.max(0, Math.min(120, Number(text)));
+    setTickerSpeedText(String(val));
     await api.put('/api/config', { tickerSpeed: val });
     onSave();
   };
@@ -830,13 +997,25 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged }: { advisor
     reload();
   };
 
-  const toggleActive = async (a: Advisory) => {
-    await api.put(`/api/advisories/${a.id}`, { active: !a.active });
+  const startEdit = (a: Advisory) => {
+    setEditingId(a.id);
+    setEditForm({ label: a.label, message: a.message });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditForm({ label: '', message: '' });
+  };
+
+  const saveEdit = async (a: Advisory) => {
+    await api.put(`/api/advisories/${a.id}`, { label: editForm.label, message: editForm.message });
+    setEditingId(null);
+    setEditForm({ label: '', message: '' });
     onSave();
   };
 
-  const update = async (a: Advisory, field: 'label' | 'message', value: string) => {
-    await api.put(`/api/advisories/${a.id}`, { [field]: value });
+  const toggleActive = async (a: Advisory) => {
+    await api.put(`/api/advisories/${a.id}`, { active: !a.active });
     onSave();
   };
 
@@ -854,26 +1033,101 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged }: { advisor
           <button style={styles.btn} onClick={add}>Add Advisory to Draft</button>
         </div>
       </div>
+      {advisories.length > 0 && (
+        <div style={styles.listHeader}>
+          <span>Current Advisories</span>
+          <span style={{ fontSize: '11px', color: '#666' }}>{advisories.length} item{advisories.length !== 1 ? 's' : ''}</span>
+        </div>
+      )}
       <div>
-        {advisories.map(a => (
-          <div key={a.id} style={{ ...styles.listCard, opacity: a.active ? 1 : 0.5 }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1 }}>
-              <LabelPicker style={{ width: '200px' }} value={a.label} onChange={v => update(a, 'label', v)} />
-              <input style={{ ...styles.input, flex: 1 }} defaultValue={a.message} onBlur={e => { if (e.target.value !== a.message) update(a, 'message', e.target.value); }} />
+        {advisories.map(a => {
+          const pub = publishedAdvisories?.find(pa => pa.id === a.id);
+          const isNewDraft = !pub;
+          const isMarkedForDeletion = a.markedForDeletion;
+          const isEditing = editingId === a.id;
+          const labelChanged = pub && pub.label !== a.label;
+          const messageChanged = pub && pub.message !== a.message;
+          const activeChanged = pub && pub.active !== a.active;
+
+          return (
+            <div key={a.id} style={{ ...styles.listCard, flexDirection: 'column', gap: '8px', opacity: isMarkedForDeletion ? 1 : (a.active ? 1 : 0.5), ...(isMarkedForDeletion ? styles.markedForDeletion : {}) }}>
+              <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '8px' }}>
+                {isNewDraft && !isMarkedForDeletion && <span style={styles.draftIndicator} title="New draft item">●</span>}
+                {isMarkedForDeletion && <span style={{ color: '#f44336', fontSize: '10px' }} title="Will be deleted on publish">🗑</span>}
+                <div style={{ flex: 1, ...(isMarkedForDeletion ? { textDecoration: 'line-through', opacity: 0.5 } : {}) }}>
+                  <span style={{ fontWeight: 700, color: '#e0e0e0' }}>{a.label}</span>
+                  <span style={{ color: '#888', margin: '0 8px' }}>—</span>
+                  <span style={{ color: '#ccc' }}>{a.message}</span>
+                </div>
+                <span style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  {isMarkedForDeletion ? (
+                    <button style={{ ...styles.smallBtn, background: '#4caf50' }} onClick={() => unmarkForDeletion(a.id)}>Undo</button>
+                  ) : (
+                    <>
+                      {activeChanged && (
+                        <span style={{ fontSize: '10px', color: '#ffc107', opacity: 0.8 }}>{pub.active ? 'ON' : 'OFF'} →</span>
+                      )}
+                      <button style={{ ...styles.smallBtn, background: a.active ? '#4caf50' : '#888' }} onClick={() => toggleActive(a)}>{a.active ? 'ON' : 'OFF'}</button>
+                      <button style={{ ...styles.smallBtn, background: isEditing ? '#00838f' : '#1976d2' }} onClick={() => isEditing ? cancelEdit() : startEdit(a)}>✎</button>
+                      <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => markForDeletion(a.id)}>✕</button>
+                    </>
+                  )}
+                </span>
+              </div>
+
+              {/* Diff indicators */}
+              {!isMarkedForDeletion && !isEditing && (labelChanged || messageChanged) && (
+                <div style={{ fontSize: '11px', color: '#ffc107', opacity: 0.8, paddingLeft: '16px' }}>
+                  {labelChanged && <span>Label was: {pub.label}</span>}
+                  {labelChanged && messageChanged && <span style={{ margin: '0 8px' }}>•</span>}
+                  {messageChanged && <span>Message was: "{pub.message}"</span>}
+                </div>
+              )}
+
+              {/* Edit form */}
+              {isEditing && !isMarkedForDeletion && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', color: '#888', width: '60px' }}>Label:</span>
+                    <LabelPicker style={{ flex: 1 }} value={editForm.label} onChange={label => setEditForm({ ...editForm, label })} />
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', color: '#888', width: '60px' }}>Message:</span>
+                    <input
+                      style={{ ...styles.input, flex: 1 }}
+                      value={editForm.message}
+                      onChange={e => setEditForm({ ...editForm, message: e.target.value })}
+                      onKeyDown={e => { if (e.key === 'Enter') saveEdit(a); if (e.key === 'Escape') cancelEdit(); }}
+                      autoFocus
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <button style={{ ...styles.smallBtn, background: '#00838f' }} onClick={() => saveEdit(a)}>Save</button>
+                    <button style={{ ...styles.smallBtn, background: '#555' }} onClick={cancelEdit}>Cancel</button>
+                  </div>
+                </div>
+              )}
             </div>
-            <span style={{ display: 'flex', gap: '4px', marginLeft: '8px' }}>
-              <button style={{ ...styles.smallBtn, background: a.active ? '#4caf50' : '#888' }} onClick={() => toggleActive(a)}>{a.active ? 'ON' : 'OFF'}</button>
-              <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => remove(a.id)}>✕</button>
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <TrashSection type="advisories" items={trash} labelFn={a => `${a.label}: ${a.message}`} onReload={reload} />
 
       <div style={{ marginTop: '12px' }}>
         <label style={{ color: '#e0e0e0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           Scroll duration
-          <input style={{ ...styles.input, width: '70px' }} type="number" min="0" max="120" value={tickerSpeed} onChange={e => saveTickerSpeed(Number(e.target.value))} />
+          <input
+            style={{ ...styles.input, width: '70px' }}
+            type="number"
+            min="0"
+            max="120"
+            value={tickerSpeedText}
+            onChange={e => {
+              setTickerSpeedText(e.target.value);
+              saveTickerSpeed(e.target.value);
+            }}
+            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+          />
           seconds (0 = stopped)
         </label>
       </div>
@@ -913,6 +1167,18 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'block',
   },
   input: { background: '#0a1628', border: '1px solid #1a3050', borderRadius: '6px', padding: '8px 12px', color: '#e0e0e0', fontSize: '14px' },
+  listHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    fontSize: '12px',
+    color: '#888',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+    marginBottom: '8px',
+    paddingBottom: '6px',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+  },
   listCard: {
     background: 'rgba(0, 0, 0, 0.15)',
     borderRadius: '8px',
@@ -922,6 +1188,16 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  draftIndicator: {
+    color: '#ffc107',
+    fontSize: '8px',
+    flexShrink: 0,
+    marginRight: '4px',
+  },
+  markedForDeletion: {
+    background: 'rgba(244, 67, 54, 0.1)',
+    border: '1px solid rgba(244, 67, 54, 0.3)',
   },
   btn: { background: '#00838f', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 16px', cursor: 'pointer', fontWeight: 600 },
   headerBtn: {

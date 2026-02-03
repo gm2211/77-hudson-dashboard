@@ -14,6 +14,8 @@ function timeAgo(dateStr: string): string {
 }
 
 export default function ServiceTable({ services }: { services: Service[] }) {
+  const hasAnyNotes = services.some(s => s.notes);
+
   return (
     <div style={styles.container}>
       <table style={styles.table}>
@@ -21,6 +23,7 @@ export default function ServiceTable({ services }: { services: Service[] }) {
           <tr>
             <th style={styles.th}>Service</th>
             <th style={styles.th}>Status</th>
+            {hasAnyNotes && <th style={styles.th}>Notes</th>}
             <th style={{ ...styles.th, textAlign: 'right' }}>Last Checked</th>
           </tr>
         </thead>
@@ -34,6 +37,11 @@ export default function ServiceTable({ services }: { services: Service[] }) {
                   {s.status}
                 </span>
               </td>
+              {hasAnyNotes && (
+                <td style={{ ...styles.td, color: '#666', fontStyle: 'italic', fontSize: '14px' }}>
+                  {s.notes || '—'}
+                </td>
+              )}
               <td style={{ ...styles.td, textAlign: 'right', color: '#888' }}>
                 {timeAgo(s.lastChecked)}
               </td>

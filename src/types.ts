@@ -2,8 +2,10 @@ export interface Service {
   id: number;
   name: string;
   status: 'Operational' | 'Maintenance' | 'Outage';
+  notes: string;
   lastChecked: string;
   sortOrder: number;
+  markedForDeletion?: boolean;
 }
 
 export interface Event {
@@ -14,6 +16,7 @@ export interface Event {
   imageUrl: string;
   accentColor: string;
   sortOrder: number;
+  markedForDeletion?: boolean;
 }
 
 export interface Advisory {
@@ -21,6 +24,7 @@ export interface Advisory {
   label: string;
   message: string;
   active: boolean;
+  markedForDeletion?: boolean;
 }
 
 export interface BuildingConfig {

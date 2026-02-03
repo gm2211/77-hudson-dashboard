@@ -32,8 +32,15 @@ router.put('/:id', async (req, res) => {
   res.json(parseEventDetails(event));
 });
 
+// Mark for deletion (draft) - will be actually deleted on publish
 router.delete('/:id', async (req, res) => {
-  await prisma.event.update({ where: { id: Number(req.params.id) }, data: { deletedAt: new Date() } });
+  await prisma.event.update({ where: { id: Number(req.params.id) }, data: { markedForDeletion: true } });
+  res.json({ ok: true });
+});
+
+// Unmark for deletion (undo in draft)
+router.post('/:id/unmark', async (req, res) => {
+  await prisma.event.update({ where: { id: Number(req.params.id) }, data: { markedForDeletion: false } });
   res.json({ ok: true });
 });
 

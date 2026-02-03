@@ -8,31 +8,35 @@ datasource db {
 }
 
 model Service {
-  id          Int       @id @default(autoincrement())
-  name        String
-  status      String    @default("Operational")
-  lastChecked DateTime  @default(now())
-  sortOrder   Int       @default(0)
-  deletedAt   DateTime?
+  id                Int       @id @default(autoincrement())
+  name              String
+  status            String    @default("Operational")
+  notes             String    @default("")
+  lastChecked       DateTime  @default(now())
+  sortOrder         Int       @default(0)
+  markedForDeletion Boolean   @default(false)
+  deletedAt         DateTime?
 }
 
 model Event {
-  id          Int       @id @default(autoincrement())
-  title       String
-  subtitle    String    @default("")
-  details     String    @default("[]")
-  imageUrl    String    @default("")
-  accentColor String    @default("")
-  sortOrder   Int       @default(0)
-  deletedAt   DateTime?
+  id                Int       @id @default(autoincrement())
+  title             String
+  subtitle          String    @default("")
+  details           String    @default("[]")
+  imageUrl          String    @default("")
+  accentColor       String    @default("")
+  sortOrder         Int       @default(0)
+  markedForDeletion Boolean   @default(false)
+  deletedAt         DateTime?
 }
 
 model Advisory {
-  id        Int       @id @default(autoincrement())
-  label     String    @default("RESIDENT ADVISORY")
-  message   String
-  active    Boolean   @default(true)
-  deletedAt DateTime?
+  id                Int       @id @default(autoincrement())
+  label             String    @default("RESIDENT ADVISORY")
+  message           String
+  active            Boolean   @default(true)
+  markedForDeletion Boolean   @default(false)
+  deletedAt         DateTime?
 }
 
 model BuildingConfig {

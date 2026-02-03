@@ -78,8 +78,9 @@ export default function EventCard({ event }: { event: Event }) {
       background: event.imageUrl
         ? `linear-gradient(to right, rgba(20,60,58,0.92) 0%, rgba(20,60,58,0.75) 50%, rgba(20,60,58,0.3) 100%), url(${event.imageUrl})`
         : 'linear-gradient(135deg, #1a5c5a 0%, #1a4a48 100%)',
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
+      backgroundSize: event.imageUrl ? '100% 100%, cover' : undefined,
+      backgroundPosition: event.imageUrl ? 'center, center' : undefined,
+      backgroundRepeat: 'no-repeat',
     }}>
       <div style={styles.content}>
         <h3 style={styles.title}>{event.title}</h3>
