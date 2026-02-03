@@ -96,23 +96,29 @@ router.get('/draft-status', async (_req, res) => {
   const published = JSON.parse(snapshot.data);
 
   // Compare only the editable fields for config to avoid false positives from metadata fields
-  const configChanged = (() => {
-    if (!current.config && !published.config) return false;
-    if (!current.config || !published.config) return true;
-    return (
-      current.config.buildingNumber !== published.config.buildingNumber ||
-      current.config.buildingName !== published.config.buildingName ||
-      current.config.subtitle !== published.config.subtitle ||
-      current.config.scrollSpeed !== published.config.scrollSpeed ||
-      current.config.tickerSpeed !== published.config.tickerSpeed
-    );
+  // Use String() to handle potential type mismatches between DB and JSON
+  const configFields = (() => {
+    if (!current.config && !published.config) return { buildingChanged: false, scrollSpeedChanged: false, tickerSpeedChanged: false };
+    if (!current.config || !published.config) return { buildingChanged: true, scrollSpeedChanged: true, tickerSpeedChanged: true };
+    return {
+      buildingChanged: (
+        String(current.config.buildingNumber || '') !== String(published.config.buildingNumber || '') ||
+        String(current.config.buildingName || '') !== String(published.config.buildingName || '') ||
+        String(current.config.subtitle || '') !== String(published.config.subtitle || '')
+      ),
+      scrollSpeedChanged: Number(current.config.scrollSpeed) !== Number(published.config.scrollSpeed),
+      tickerSpeedChanged: Number(current.config.tickerSpeed) !== Number(published.config.tickerSpeed),
+    };
   })();
 
+  const eventsChanged = JSON.stringify(current.events) !== JSON.stringify(published.events);
+  const advisoriesChanged = JSON.stringify(current.advisories) !== JSON.stringify(published.advisories);
+
   const sectionChanges = {
-    config: configChanged,
+    config: configFields.buildingChanged,
     services: JSON.stringify(current.services) !== JSON.stringify(published.services),
-    events: JSON.stringify(current.events) !== JSON.stringify(published.events),
-    advisories: JSON.stringify(current.advisories) !== JSON.stringify(published.advisories),
+    events: eventsChanged || configFields.scrollSpeedChanged,
+    advisories: advisoriesChanged || configFields.tickerSpeedChanged,
   };
 
   const hasChanges = Object.values(sectionChanges).some(Boolean);

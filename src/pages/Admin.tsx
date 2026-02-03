@@ -82,8 +82,12 @@ export default function Admin() {
     onSave();
   };
 
+  const pendingBgStyle: React.CSSProperties = hasChanges ? {
+    boxShadow: 'inset 0 0 30px 8px rgba(255, 170, 0, 0.45)',
+  } : {};
+
   return (
-    <div style={{ ...styles.pageWrap, ...(hasChanges ? { background: '#0f1a28' } : {}) }}>
+    <div style={{ ...styles.pageWrap, ...pendingBgStyle }}>
       <div style={styles.page}>
         <header style={styles.header}>
           <div>
@@ -166,11 +170,14 @@ function ConfigSection({ config, onSave, hasChanged }: { config: BuildingConfig 
         Building Config
         {hasChanged && <span style={styles.changeIndicator}>●</span>}
       </h2>
-      <div style={styles.row}>
-        <input style={styles.input} placeholder="Building #" value={form.buildingNumber} onChange={e => setForm({ ...form, buildingNumber: e.target.value })} />
-        <input style={styles.input} placeholder="Building Name" value={form.buildingName} onChange={e => setForm({ ...form, buildingName: e.target.value })} />
-        <input style={styles.input} placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
-        <button style={styles.btn} onClick={save}>Save Draft</button>
+      <div style={{ ...styles.formGroup, marginBottom: 0 }}>
+        <span style={styles.formLabel}>Building Details</span>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <input style={styles.input} placeholder="Building #" value={form.buildingNumber} onChange={e => setForm({ ...form, buildingNumber: e.target.value })} />
+          <input style={styles.input} placeholder="Building Name" value={form.buildingName} onChange={e => setForm({ ...form, buildingName: e.target.value })} />
+          <input style={{ ...styles.input, flex: 1 }} placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
+          <button style={styles.btn} onClick={save}>Save Draft</button>
+        </div>
       </div>
     </section>
   );
@@ -192,7 +199,7 @@ function TrashSection<T extends { id: number }>({ type, items, labelFn, onReload
   if (items.length === 0) return null;
 
   return (
-    <div style={{ marginTop: '16px', borderTop: '1px solid #1a3050', paddingTop: '12px' }}>
+    <div style={{ marginTop: '12px' }}>
       <div
         style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#888', fontSize: '13px', marginBottom: open ? '8px' : 0 }}
         onClick={() => setOpen(!open)}
@@ -254,21 +261,24 @@ function ServicesSection({ services, onSave, hasChanged, publishedServices }: { 
         Services
         {hasChanged && <span style={styles.changeIndicator}>●</span>}
       </h2>
-      <div style={styles.row}>
-        <input style={styles.input} placeholder="Service name" value={name} onChange={e => setName(e.target.value)} />
-        <StatusSelect value={status} onChange={setStatus} />
-        <button style={styles.btn} onClick={add}>Add Service to Draft</button>
+      <div style={styles.formGroup}>
+        <span style={styles.formLabel}>Add New Service</span>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <input style={styles.input} placeholder="Service name" value={name} onChange={e => setName(e.target.value)} />
+          <StatusSelect value={status} onChange={setStatus} />
+          <button style={styles.btn} onClick={add}>Add Service to Draft</button>
+        </div>
       </div>
-      <ul style={styles.list}>
+      <div>
         {services.map(s => {
           const pub = getPublishedService(s.id);
           const statusChanged = pub && pub.status !== s.status;
           const timeChanged = pub && pub.lastChecked !== s.lastChecked;
 
           return (
-            <li key={s.id} style={styles.listItem}>
+            <div key={s.id} style={styles.listCard}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span>{s.name}</span>
+                <span style={{ fontWeight: 500 }}>{s.name}</span>
                 <span style={{ fontSize: '11px', color: '#888' }}>
                   Last: {formatLastChecked(s.lastChecked)}
                   {timeChanged && (
@@ -284,10 +294,10 @@ function ServicesSection({ services, onSave, hasChanged, publishedServices }: { 
                 <StatusSelect value={s.status} onChange={v => changeStatus(s, v)} style={{ padding: '4px 8px', fontSize: '12px' }} />
                 <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => remove(s.id)}>✕</button>
               </span>
-            </li>
+            </div>
           );
         })}
-      </ul>
+      </div>
       <TrashSection type="services" items={trash} labelFn={s => s.name} onReload={reload} />
     </section>
   );
@@ -363,6 +373,12 @@ function parseMarkdown(md: string): string {
   const result: string[] = [];
   let inBulletList = false;
   let inNumberedList = false;
+  let listCounter = 0;
+
+  const bulletStyle = 'list-style:none;padding:0;margin:8px 0';
+  const olStyle = 'list-style:none;padding:0;margin:8px 0;counter-reset:item';
+  const bulletLiStyle = 'display:flex;align-items:baseline;gap:8px;margin-bottom:4px';
+  const olLiStyle = 'display:flex;align-items:baseline;gap:8px;margin-bottom:4px;counter-increment:item';
 
   for (const line of lines) {
     let processed = line;
@@ -374,29 +390,31 @@ function parseMarkdown(md: string): string {
     if (bulletMatch) {
       if (!inBulletList) {
         if (inNumberedList) { result.push('</ol>'); inNumberedList = false; }
-        result.push('<ul>');
+        result.push(`<ul style="${bulletStyle}">`);
         inBulletList = true;
       }
-      processed = `<li>${bulletMatch[1]}</li>`;
+      processed = `<li style="${bulletLiStyle}"><span style="color:#e0e0e0;font-size:8px;flex-shrink:0">●</span><span>${bulletMatch[1]}</span></li>`;
     } else if (numberedMatch) {
       if (!inNumberedList) {
         if (inBulletList) { result.push('</ul>'); inBulletList = false; }
-        result.push('<ol>');
+        result.push(`<ol style="${olStyle}">`);
         inNumberedList = true;
+        listCounter = 0;
       }
-      processed = `<li>${numberedMatch[1]}</li>`;
+      listCounter++;
+      processed = `<li style="${olLiStyle}"><span style="color:#e0e0e0;font-size:12px;flex-shrink:0;min-width:16px">${listCounter}.</span><span>${numberedMatch[1]}</span></li>`;
     } else {
       // Close any open lists
       if (inBulletList) { result.push('</ul>'); inBulletList = false; }
-      if (inNumberedList) { result.push('</ol>'); inNumberedList = false; }
+      if (inNumberedList) { result.push('</ol>'); inNumberedList = false; listCounter = 0; }
 
       // Headers
       if (processed.match(/^### (.+)$/)) {
-        processed = processed.replace(/^### (.+)$/, '<h3>$1</h3>');
+        processed = processed.replace(/^### (.+)$/, '<h3 style="margin:8px 0 4px;font-size:14px">$1</h3>');
       } else if (processed.match(/^## (.+)$/)) {
-        processed = processed.replace(/^## (.+)$/, '<h2>$1</h2>');
+        processed = processed.replace(/^## (.+)$/, '<h2 style="margin:8px 0 4px;font-size:16px">$1</h2>');
       } else if (processed.match(/^# (.+)$/)) {
-        processed = processed.replace(/^# (.+)$/, '<h1>$1</h1>');
+        processed = processed.replace(/^# (.+)$/, '<h1 style="margin:8px 0 4px;font-size:18px">$1</h1>');
       } else if (processed.trim() === '') {
         processed = '<br/>';
       } else {
@@ -430,8 +448,6 @@ type CardPreviewData = {
 };
 
 function EventCardPreview({ title, subtitle, imageUrl, details }: CardPreviewData & { details: string }) {
-  const detailLines = details.split('\n').filter(Boolean);
-
   // Match actual EventCard component styling
   const cardStyle: React.CSSProperties = {
     background: 'linear-gradient(135deg, #1a5c5a 0%, #1a4a48 100%)',
@@ -448,6 +464,8 @@ function EventCardPreview({ title, subtitle, imageUrl, details }: CardPreviewDat
     } : {}),
   };
 
+  const renderedMarkdown = parseMarkdown(details);
+
   return (
     <div style={cardStyle}>
       <div style={{ padding: '24px 28px' }}>
@@ -459,19 +477,16 @@ function EventCardPreview({ title, subtitle, imageUrl, details }: CardPreviewDat
             {subtitle || <span style={{ color: '#557' }}>No subtitle</span>}
           </p>
         )}
-        {detailLines.length > 0 ? (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {detailLines.map((line, i) => (
-              <li key={i} style={{ fontSize: '14px', color: '#e0e0e0', marginBottom: '4px', display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                <span style={{ color: '#e0e0e0', fontSize: '8px', flexShrink: 0 }}>●</span>
-                <span dangerouslySetInnerHTML={{ __html: parseMarkdown(line).replace(/<br\/>$/g, '') }} />
-              </li>
-            ))}
-          </ul>
+        {details.trim() ? (
+          <div
+            style={{ fontSize: '14px', color: '#e0e0e0', lineHeight: 1.5 }}
+            dangerouslySetInnerHTML={{ __html: renderedMarkdown }}
+          />
         ) : (
           <p style={{ margin: 0, color: '#557', fontSize: '13px', fontStyle: 'italic' }}>No details yet</p>
         )}
       </div>
+      <div style={{ height: '4px', width: '100%', background: '#00bcd4' }} />
     </div>
   );
 }
@@ -633,41 +648,47 @@ function EventsSection({ events, config, onSave, hasChanged }: { events: Event[]
         Events
         {hasChanged && <span style={styles.changeIndicator}>●</span>}
       </h2>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-        <div style={styles.row}>
-          <input style={{ ...styles.input, flex: 1 }} placeholder="Title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
-          <input style={{ ...styles.input, flex: 1 }} placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
-        </div>
-        <ImagePicker label="Image" value={form.imageUrl} onChange={imageUrl => setForm({ ...form, imageUrl })} />
-        <MarkdownEditor
-          key={editingId ?? 'new'}
-          value={form.details}
-          onChange={details => setForm({ ...form, details })}
-          cardPreview={{ title: form.title, subtitle: form.subtitle, imageUrl: form.imageUrl }}
-        />
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button style={styles.btn} onClick={submit}>{editingId ? 'Save Draft' : 'Add Event to Draft'}</button>
-          {editingId && <button style={{ ...styles.btn, background: '#555' }} onClick={cancelEdit}>Cancel</button>}
+      <div style={styles.formGroup}>
+        <span style={styles.formLabel}>{editingId ? 'Edit Event' : 'Add New Event'}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <input style={{ ...styles.input, flex: 1 }} placeholder="Title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+            <input style={{ ...styles.input, flex: 1 }} placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
+          </div>
+          <ImagePicker label="Image" value={form.imageUrl} onChange={imageUrl => setForm({ ...form, imageUrl })} />
+          <MarkdownEditor
+            key={editingId ?? 'new'}
+            value={form.details}
+            onChange={details => setForm({ ...form, details })}
+            cardPreview={{ title: form.title, subtitle: form.subtitle, imageUrl: form.imageUrl }}
+          />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button style={styles.btn} onClick={submit}>{editingId ? 'Save Draft' : 'Add Event to Draft'}</button>
+            {editingId && <button style={{ ...styles.btn, background: '#555' }} onClick={cancelEdit}>Cancel</button>}
+          </div>
         </div>
       </div>
-      <ul style={styles.list}>
+      <div>
         {events.map(e => (
-          <li key={e.id} style={styles.listItem}>
-            <span><strong>{e.title}</strong> — {e.subtitle}</span>
+          <div key={e.id} style={styles.listCard}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontWeight: 600, color: '#fff' }}>{e.title}</span>
+              <span style={{ fontSize: '12px', color: '#888' }}>{e.subtitle}</span>
+            </div>
             <span style={{ display: 'flex', gap: '4px' }}>
               <button style={{ ...styles.smallBtn, background: '#1976d2' }} onClick={() => startEdit(e)}>✎</button>
               <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => remove(e.id)}>✕</button>
             </span>
-          </li>
+          </div>
         ))}
-      </ul>
+      </div>
       <TrashSection type="events" items={trash} labelFn={e => e.title} onReload={reload} />
 
-      <div style={{ marginTop: '16px', paddingTop: '12px', ...(trash.length === 0 ? { borderTop: '1px solid #1a3050' } : {}) }}>
+      <div style={{ marginTop: '12px' }}>
         <label style={{ color: '#e0e0e0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          Scroll speed
-          <input style={{ ...styles.input, width: '70px' }} type="number" min="0" max="200" value={scrollSpeed} onChange={e => saveScrollSpeed(Number(e.target.value))} />
-          px/s
+          Scroll duration
+          <input style={{ ...styles.input, width: '70px' }} type="number" min="0" max="120" value={scrollSpeed} onChange={e => saveScrollSpeed(Number(e.target.value))} />
+          seconds (0 = stopped)
         </label>
       </div>
     </section>
@@ -754,28 +775,33 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged }: { advisor
         Advisories
         {hasChanged && <span style={styles.changeIndicator}>●</span>}
       </h2>
-      <div style={styles.row}>
-        <LabelPicker style={{ width: '200px' }} value={form.label} onChange={label => setForm({ ...form, label })} />
-        <input style={{ ...styles.input, flex: 1 }} placeholder="Message" value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} />
-        <button style={styles.btn} onClick={add}>Add Advisory to Draft</button>
+      <div style={styles.formGroup}>
+        <span style={styles.formLabel}>Add New Advisory</span>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <LabelPicker style={{ width: '200px' }} value={form.label} onChange={label => setForm({ ...form, label })} />
+          <input style={{ ...styles.input, flex: 1 }} placeholder="Message" value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} />
+          <button style={styles.btn} onClick={add}>Add Advisory to Draft</button>
+        </div>
       </div>
-      <ul style={styles.list}>
+      <div>
         {advisories.map(a => (
-          <li key={a.id} style={{ ...styles.listItem, flexDirection: 'column', alignItems: 'stretch', gap: '6px' }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', opacity: a.active ? 1 : 0.4 }}>
+          <div key={a.id} style={{ ...styles.listCard, opacity: a.active ? 1 : 0.5 }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1 }}>
               <LabelPicker style={{ width: '200px' }} value={a.label} onChange={v => update(a, 'label', v)} />
               <input style={{ ...styles.input, flex: 1 }} defaultValue={a.message} onBlur={e => { if (e.target.value !== a.message) update(a, 'message', e.target.value); }} />
+            </div>
+            <span style={{ display: 'flex', gap: '4px', marginLeft: '8px' }}>
               <button style={{ ...styles.smallBtn, background: a.active ? '#4caf50' : '#888' }} onClick={() => toggleActive(a)}>{a.active ? 'ON' : 'OFF'}</button>
               <button style={{ ...styles.smallBtn, background: '#f44336' }} onClick={() => remove(a.id)}>✕</button>
-            </div>
-          </li>
+            </span>
+          </div>
         ))}
-      </ul>
+      </div>
       <TrashSection type="advisories" items={trash} labelFn={a => `${a.label}: ${a.message}`} onReload={reload} />
 
-      <div style={{ marginTop: '16px', paddingTop: '12px', ...(trash.length === 0 ? { borderTop: '1px solid #1a3050' } : {}) }}>
+      <div style={{ marginTop: '12px' }}>
         <label style={{ color: '#e0e0e0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          Ticker scroll duration
+          Scroll duration
           <input style={{ ...styles.input, width: '70px' }} type="number" min="0" max="120" value={tickerSpeed} onChange={e => saveTickerSpeed(Number(e.target.value))} />
           seconds (0 = stopped)
         </label>
@@ -800,7 +826,32 @@ const styles: Record<string, React.CSSProperties> = {
     marginLeft: '4px',
   },
   row: { display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' },
+  formGroup: {
+    background: 'rgba(0, 0, 0, 0.2)',
+    borderRadius: '8px',
+    padding: '12px',
+    marginBottom: '16px',
+    border: '1px solid rgba(255, 255, 255, 0.05)',
+  },
+  formLabel: {
+    fontSize: '11px',
+    color: '#888',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+    marginBottom: '8px',
+    display: 'block',
+  },
   input: { background: '#0a1628', border: '1px solid #1a3050', borderRadius: '6px', padding: '8px 12px', color: '#e0e0e0', fontSize: '14px' },
+  listCard: {
+    background: 'rgba(0, 0, 0, 0.15)',
+    borderRadius: '8px',
+    padding: '12px 14px',
+    marginBottom: '8px',
+    border: '1px solid rgba(255, 255, 255, 0.03)',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   btn: { background: '#00838f', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 16px', cursor: 'pointer', fontWeight: 600 },
   headerBtn: {
     background: 'linear-gradient(135deg, #1a5a3a 0%, #0d3d28 100%)',

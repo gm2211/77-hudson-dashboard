@@ -4,3 +4,4 @@ dist
 /generated/prisma
 prisma/dev.db
 prisma/dev.db-journal
+prisma/migrations

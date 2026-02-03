@@ -1,6 +1,13 @@
-# Hudson Dashboard
+# 77 Hudson Dashboard
 
-A building dashboard designed to run on a lobby TV. Shows system statuses, events, and advisories. Content is managed through a built-in admin page.
+A digital signage dashboard for residential building lobbies. Displays real-time service status, upcoming events, and scrolling advisories on lobby screens.
+
+**Features:**
+- Service status board (Operational/Maintenance/Outage)
+- Event cards with images and markdown details
+- Scrolling advisory ticker
+- Admin UI with draft/publish workflow
+- Real-time updates via SSE
 
 ## Quickstart
 
@@ -66,8 +73,8 @@ prisma/
 
 ```bash
 npm install
-npx prisma migrate dev    # creates/updates SQLite DB
-npm run dev                # starts on :3000 with hot reload
+npx prisma db push    # creates/updates SQLite DB
+npm run dev           # starts on :3000 with hot reload
 ```
 
 ### Data model changes
@@ -75,7 +82,7 @@ npm run dev                # starts on :3000 with hot reload
 Edit `prisma/schema.prisma`, then:
 
 ```bash
-npx prisma migrate dev --name describe-your-change
+npx prisma db push
 ```
 
 Prisma generates types automatically — the API routes and frontend pick them up.
