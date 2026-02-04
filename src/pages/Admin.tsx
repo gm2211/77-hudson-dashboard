@@ -668,7 +668,7 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
   }, [config]);
 
   const saveScrollSpeed = async (text: string) => {
-    const val = text === '' ? 0 : Math.max(0, Math.min(120, Number(text)));
+    const val = text === '' ? 0 : Math.max(0, Number(text));
     setScrollSpeedText(String(val));
     await api.put('/api/config', { scrollSpeed: val });
     onSave();
@@ -864,7 +864,6 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
             style={{ ...styles.input, width: '70px' }}
             type="number"
             min="0"
-            max="120"
             value={scrollSpeedText}
             onChange={e => {
               setScrollSpeedText(e.target.value);
@@ -936,7 +935,7 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAd
   };
 
   const saveTickerSpeed = async (text: string) => {
-    const val = text === '' ? 0 : Math.max(0, Math.min(120, Number(text)));
+    const val = text === '' ? 0 : Math.max(0, Number(text));
     setTickerSpeedText(String(val));
     await api.put('/api/config', { tickerSpeed: val });
     onSave();
@@ -1070,7 +1069,6 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAd
             style={{ ...styles.input, width: '70px' }}
             type="number"
             min="0"
-            max="120"
             value={tickerSpeedText}
             onChange={e => {
               setTickerSpeedText(e.target.value);

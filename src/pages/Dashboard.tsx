@@ -94,18 +94,19 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
 
     let animId: number;
     let lastTime: number | null = null;
-    // scrollSpeed is pixels per second
-    const pxPerMs = scrollSpeed / 1000;
 
     const step = (time: number) => {
       if (lastTime !== null) {
         const dt = time - lastTime;
+        // scrollSpeed is duration in seconds to complete one cycle (like tickerSpeed)
+        // higher number = slower, matching the advisory ticker behavior
+        const contentHeight = container.scrollHeight / 2;
+        const pxPerMs = contentHeight / (scrollSpeed * 1000);
         container.scrollTop += pxPerMs * dt;
 
         // When we've scrolled past the first set, jump back to create seamless loop
-        const halfScroll = container.scrollHeight / 2;
-        if (container.scrollTop >= halfScroll) {
-          container.scrollTop -= halfScroll;
+        if (container.scrollTop >= contentHeight) {
+          container.scrollTop -= contentHeight;
         }
       }
       lastTime = time;
