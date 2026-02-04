@@ -30,24 +30,29 @@ export default function Admin() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const load = useCallback(() => {
-    api.get('/api/services').then(setServices);
-    api.get('/api/events').then(setEvents);
-    api.get('/api/advisories').then(setAdvisories);
-    api.get('/api/config').then(setConfig);
+  const load = useCallback(async () => {
+    const [servicesData, eventsData, advisoriesData, configData] = await Promise.all([
+      api.get('/api/services'),
+      api.get('/api/events'),
+      api.get('/api/advisories'),
+      api.get('/api/config'),
+    ]);
+    setServices(servicesData);
+    setEvents(eventsData);
+    setAdvisories(advisoriesData);
+    setConfig(configData);
   }, []);
 
-  const checkDraft = useCallback(() => {
-    api.get('/api/snapshots/draft-status').then(d => {
-      setHasChanges(d.hasChanges);
-      setSectionChanges(d.sectionChanges || { config: false, services: false, events: false, advisories: false });
-      setPublished(d.published || null);
-    });
+  const checkDraft = useCallback(async () => {
+    const d = await api.get('/api/snapshots/draft-status');
+    setHasChanges(d.hasChanges);
+    setSectionChanges(d.sectionChanges || { config: false, services: false, events: false, advisories: false });
+    setPublished(d.published || null);
   }, []);
 
-  const onSave = useCallback(() => {
-    load();
-    checkDraft();
+  const onSave = useCallback(async () => {
+    await load();
+    await checkDraft();
   }, [load, checkDraft]);
 
   // Lighter callback for config changes - doesn't reload config
@@ -58,14 +63,27 @@ export default function Admin() {
   useEffect(() => { load(); checkDraft(); }, [load, checkDraft]);
 
   const publish = async () => {
-    await api.post('/api/snapshots');
-    checkDraft();
+    const result = await api.post('/api/snapshots');
+    // Use the returned state directly for both current data and published
+    // This ensures they're identical, eliminating false "changed" indicators
+    if (result.state) {
+      setServices(result.state.services || []);
+      setEvents(result.state.events || []);
+      setAdvisories(result.state.advisories || []);
+      setConfig(result.state.config || null);
+      setPublished(result.state);
+      setHasChanges(false);
+      setSectionChanges({ config: false, services: false, events: false, advisories: false });
+    } else {
+      // Fallback to old behavior if state not returned
+      await onSave();
+    }
   };
 
   const discard = async () => {
     if (!confirm('Discard all unpublished changes?')) return;
     await api.post('/api/snapshots/discard');
-    onSave();
+    await onSave();
   };
 
   const pendingBgStyle: React.CSSProperties = hasChanges ? {
@@ -286,7 +304,7 @@ function ServicesSection({ services, onSave, hasChanged, publishedServices }: { 
       </h2>
       {formExpanded ? (
         <div style={styles.formGroup}>
-          <span style={styles.formLabel}>Add New Service</span>
+          <span style={styles.formLabel}>Add New Service Status</span>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <input style={styles.input} placeholder="Service name" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') add(); }} autoFocus />
             <StatusSelect value={status} onChange={setStatus} />
@@ -299,7 +317,7 @@ function ServicesSection({ services, onSave, hasChanged, publishedServices }: { 
           style={{ ...styles.btn, width: '100%', marginBottom: '16px' }}
           onClick={() => setFormExpanded(true)}
         >
-          + Add New Service
+          + Add New Service Status
         </button>
       )}
       {services.length > 0 && (
@@ -492,7 +510,7 @@ function EventCardPreview({ title, subtitle, imageUrl, details }: CardPreviewDat
     border: '1px solid rgba(255,255,255,0.1)',
     display: 'flex',
     flexDirection: 'column',
-    maxWidth: '320px',
+    maxWidth: '480px',
   };
 
   const renderedMarkdown = parseMarkdown(details);

@@ -265,7 +265,9 @@ router.post('/', async (_req, res) => {
   });
 
   broadcast();
-  res.json({ ok: true, version });
+  // Return the published state so client can use it directly
+  // This ensures events and published.events are identical (same object)
+  res.json({ ok: true, version, state });
 });
 
 // POST /api/snapshots/discard - Discard draft changes (replaces /api/discard)

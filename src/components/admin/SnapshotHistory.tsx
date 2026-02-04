@@ -53,6 +53,14 @@ export function SnapshotHistory({ onRestore }: SnapshotHistoryProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [previewVersion, goToPrevVersion, goToNextVersion]);
 
+  // Prevent body scroll when preview modal is open
+  useEffect(() => {
+    if (previewVersion !== null) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [previewVersion]);
+
   const loadDiff = async (version: number) => {
     if (selectedVersion === version) {
       setSelectedVersion(null);
@@ -87,11 +95,14 @@ export function SnapshotHistory({ onRestore }: SnapshotHistoryProps) {
     api.get<Snapshot[]>('/api/snapshots').then(setSnapshots);
   };
 
-  if (snapshots.length === 0) {
+  // Exclude the current (latest) version from history - it's the current state
+  const historicalSnapshots = snapshots.slice(1);
+
+  if (historicalSnapshots.length === 0) {
     return (
       <section style={styles.section}>
         <h2 style={styles.sectionTitle}>Version History</h2>
-        <p style={{ color: '#888', fontSize: '14px' }}>No published versions yet.</p>
+        <p style={{ color: '#888', fontSize: '14px' }}>No previous versions yet.</p>
       </section>
     );
   }
@@ -100,7 +111,7 @@ export function SnapshotHistory({ onRestore }: SnapshotHistoryProps) {
     <section style={styles.section}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <h2 style={{ ...styles.sectionTitle, margin: 0 }}>Version History</h2>
-        {snapshots.length > 1 && (
+        {historicalSnapshots.length > 0 && (
           <button
             style={{ ...styles.smallBtn, background: '#b71c1c', fontSize: '11px' }}
             onClick={purgeAllHistory}
@@ -110,7 +121,7 @@ export function SnapshotHistory({ onRestore }: SnapshotHistoryProps) {
         )}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {snapshots.map((s, index) => (
+        {historicalSnapshots.map((s) => (
           <div key={s.version}>
             <div style={styles.snapshotRow}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -144,15 +155,13 @@ export function SnapshotHistory({ onRestore }: SnapshotHistoryProps) {
                 >
                   Restore All
                 </button>
-                {snapshots.length > 1 && (
-                  <button
-                    style={{ ...styles.smallBtn, background: '#b71c1c' }}
-                    onClick={() => deleteSnapshot(s.version)}
-                    title="Delete this snapshot"
-                  >
-                    ✕
-                  </button>
-                )}
+                <button
+                  style={{ ...styles.smallBtn, background: '#b71c1c' }}
+                  onClick={() => deleteSnapshot(s.version)}
+                  title="Delete this snapshot"
+                >
+                  ✕
+                </button>
               </div>
             </div>
 
@@ -254,10 +263,6 @@ interface SnapshotDiffViewProps {
 }
 
 function SnapshotDiffView({ diff, sourceVersion, onRestore, onClose }: SnapshotDiffViewProps) {
-  const [selectedServices, setSelectedServices] = useState<Set<number>>(new Set());
-  const [selectedEvents, setSelectedEvents] = useState<Set<number>>(new Set());
-  const [selectedAdvisories, setSelectedAdvisories] = useState<Set<number>>(new Set());
-
   const hasAnyDiff =
     diff.services.added.length > 0 ||
     diff.services.removed.length > 0 ||
@@ -273,55 +278,10 @@ function SnapshotDiffView({ diff, sourceVersion, onRestore, onClose }: SnapshotD
   if (!hasAnyDiff) {
     return (
       <div style={{ padding: '12px', color: '#888' }}>
-        No differences between v{sourceVersion} and current draft.
+        No differences between v{sourceVersion} and current.
       </div>
     );
   }
-
-  const toggleService = (id: number) => {
-    setSelectedServices((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleEvent = (id: number) => {
-    setSelectedEvents((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleAdvisory = (id: number) => {
-    setSelectedAdvisories((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const restoreSelected = async () => {
-    const items: { services?: number[]; events?: number[]; advisories?: number[] } = {};
-    if (selectedServices.size > 0) items.services = Array.from(selectedServices);
-    if (selectedEvents.size > 0) items.events = Array.from(selectedEvents);
-    if (selectedAdvisories.size > 0) items.advisories = Array.from(selectedAdvisories);
-
-    if (Object.keys(items).length === 0) {
-      alert('Please select at least one item to restore.');
-      return;
-    }
-
-    await api.post('/api/snapshots/restore-items', { sourceVersion, items });
-    setSelectedServices(new Set());
-    setSelectedEvents(new Set());
-    setSelectedAdvisories(new Set());
-    onRestore();
-  };
 
   const restoreSingleItem = async (type: 'services' | 'events' | 'advisories', id: number) => {
     await api.post('/api/snapshots/restore-items', {
@@ -331,242 +291,189 @@ function SnapshotDiffView({ diff, sourceVersion, onRestore, onClose }: SnapshotD
     onRestore();
   };
 
-  const selectAllInSection = (type: 'services' | 'events' | 'advisories') => {
-    const ids: number[] = [];
-    if (type === 'services') {
-      diff.services.removed.forEach((s) => ids.push(s.id));
-      diff.services.changed.forEach((c) => ids.push(c.from.id));
-    } else if (type === 'events') {
-      diff.events.removed.forEach((e) => ids.push(e.id));
-      diff.events.changed.forEach((c) => ids.push(c.from.id));
-    } else {
-      diff.advisories.removed.forEach((a) => ids.push(a.id));
-      diff.advisories.changed.forEach((c) => ids.push(c.from.id));
-    }
-
-    if (type === 'services') setSelectedServices(new Set(ids));
-    else if (type === 'events') setSelectedEvents(new Set(ids));
-    else setSelectedAdvisories(new Set(ids));
-  };
-
-  const totalSelected = selectedServices.size + selectedEvents.size + selectedAdvisories.size;
+  const columnStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
+  const headerStyle: React.CSSProperties = { fontSize: '11px', fontWeight: 600, color: '#888', padding: '8px 12px', borderBottom: '1px solid #1a3050' };
+  const cellStyle: React.CSSProperties = { padding: '8px 12px', fontSize: '13px', borderBottom: '1px solid rgba(255,255,255,0.05)' };
+  const removedBg = 'rgba(244, 67, 54, 0.15)';
+  const addedBg = 'rgba(76, 175, 80, 0.15)';
+  const changedBg = 'rgba(255, 193, 7, 0.1)';
 
   return (
     <div style={{ padding: '12px 0' }}>
-      <div style={{ fontSize: '12px', color: '#888', marginBottom: '12px' }}>
-        Comparing v{sourceVersion} → Current Draft
+      {/* Side-by-side header */}
+      <div style={{ display: 'flex', gap: '2px', marginBottom: '16px' }}>
+        <div style={{ ...columnStyle, ...headerStyle, background: 'rgba(244, 67, 54, 0.1)', borderRadius: '6px 0 0 0' }}>
+          v{sourceVersion}
+        </div>
+        <div style={{ ...columnStyle, ...headerStyle, background: 'rgba(76, 175, 80, 0.1)', borderRadius: '0 6px 0 0' }}>
+          Current
+        </div>
       </div>
 
       {/* Services */}
       {(diff.services.added.length > 0 || diff.services.removed.length > 0 || diff.services.changed.length > 0) && (
-        <DiffSection
-          title="SERVICES"
-          onSelectAll={() => selectAllInSection('services')}
-        >
-          {diff.services.added.map((s) => (
-            <DiffItem key={s.id} type="added" label={s.name} description="New in draft" />
-          ))}
+        <SideBySideSection title="SERVICES">
           {diff.services.removed.map((s) => (
-            <DiffItem
+            <SideBySideRow
               key={s.id}
-              type="removed"
-              label={s.name}
-              description={`Was ${s.status}`}
-              checked={selectedServices.has(s.id)}
-              onToggle={() => toggleService(s.id)}
+              left={<span style={{ color: '#f44336' }}>− {s.name} <span style={{ color: '#888', fontSize: '11px' }}>({s.status})</span></span>}
+              right={null}
+              leftBg={removedBg}
               onRestore={() => restoreSingleItem('services', s.id)}
             />
           ))}
+          {diff.services.added.map((s) => (
+            <SideBySideRow
+              key={s.id}
+              left={null}
+              right={<span style={{ color: '#4caf50' }}>+ {s.name} <span style={{ color: '#888', fontSize: '11px' }}>({s.status})</span></span>}
+              rightBg={addedBg}
+            />
+          ))}
           {diff.services.changed.map((c) => (
-            <DiffItem
+            <SideBySideRow
               key={c.from.id}
-              type="changed"
-              label={c.to.name}
-              description={describeServiceChange(c.from, c.to)}
-              checked={selectedServices.has(c.from.id)}
-              onToggle={() => toggleService(c.from.id)}
+              left={<span style={{ color: '#ffc107' }}>{c.from.name} <span style={{ color: '#888', fontSize: '11px' }}>({c.from.status})</span></span>}
+              right={<span style={{ color: '#ffc107' }}>{c.to.name} <span style={{ color: '#888', fontSize: '11px' }}>({c.to.status})</span></span>}
+              leftBg={changedBg}
+              rightBg={changedBg}
               onRestore={() => restoreSingleItem('services', c.from.id)}
             />
           ))}
-        </DiffSection>
+        </SideBySideSection>
       )}
 
       {/* Events */}
       {(diff.events.added.length > 0 || diff.events.removed.length > 0 || diff.events.changed.length > 0) && (
-        <DiffSection
-          title="EVENTS"
-          onSelectAll={() => selectAllInSection('events')}
-        >
-          {diff.events.added.map((e) => (
-            <DiffItem key={e.id} type="added" label={e.title} description="New in draft" />
-          ))}
+        <SideBySideSection title="EVENTS">
           {diff.events.removed.map((e) => (
-            <DiffItem
+            <SideBySideRow
               key={e.id}
-              type="removed"
-              label={e.title}
-              description="Was removed"
-              checked={selectedEvents.has(e.id)}
-              onToggle={() => toggleEvent(e.id)}
+              left={<span style={{ color: '#f44336' }}>− {e.title}</span>}
+              right={null}
+              leftBg={removedBg}
               onRestore={() => restoreSingleItem('events', e.id)}
             />
           ))}
+          {diff.events.added.map((e) => (
+            <SideBySideRow
+              key={e.id}
+              left={null}
+              right={<span style={{ color: '#4caf50' }}>+ {e.title}</span>}
+              rightBg={addedBg}
+            />
+          ))}
           {diff.events.changed.map((c) => (
-            <DiffItem
+            <SideBySideRow
               key={c.from.id}
-              type="changed"
-              label={c.to.title}
-              description={describeEventChange(c.from, c.to)}
-              checked={selectedEvents.has(c.from.id)}
-              onToggle={() => toggleEvent(c.from.id)}
+              left={<span style={{ color: '#ffc107' }}>{c.from.title}</span>}
+              right={<span style={{ color: '#ffc107' }}>{c.to.title}</span>}
+              leftBg={changedBg}
+              rightBg={changedBg}
               onRestore={() => restoreSingleItem('events', c.from.id)}
             />
           ))}
-        </DiffSection>
+        </SideBySideSection>
       )}
 
       {/* Advisories */}
       {(diff.advisories.added.length > 0 || diff.advisories.removed.length > 0 || diff.advisories.changed.length > 0) && (
-        <DiffSection
-          title="ADVISORIES"
-          onSelectAll={() => selectAllInSection('advisories')}
-        >
-          {diff.advisories.added.map((a) => (
-            <DiffItem key={a.id} type="added" label={a.label} description="New in draft" />
-          ))}
+        <SideBySideSection title="ADVISORIES">
           {diff.advisories.removed.map((a) => (
-            <DiffItem
+            <SideBySideRow
               key={a.id}
-              type="removed"
-              label={a.label}
-              description={`"${a.message.slice(0, 30)}..."`}
-              checked={selectedAdvisories.has(a.id)}
-              onToggle={() => toggleAdvisory(a.id)}
+              left={<span style={{ color: '#f44336' }}>− {a.label}</span>}
+              right={null}
+              leftBg={removedBg}
               onRestore={() => restoreSingleItem('advisories', a.id)}
             />
           ))}
+          {diff.advisories.added.map((a) => (
+            <SideBySideRow
+              key={a.id}
+              left={null}
+              right={<span style={{ color: '#4caf50' }}>+ {a.label}</span>}
+              rightBg={addedBg}
+            />
+          ))}
           {diff.advisories.changed.map((c) => (
-            <DiffItem
+            <SideBySideRow
               key={c.from.id}
-              type="changed"
-              label={c.to.label}
-              description={describeAdvisoryChange(c.from, c.to)}
-              checked={selectedAdvisories.has(c.from.id)}
-              onToggle={() => toggleAdvisory(c.from.id)}
+              left={<span style={{ color: '#ffc107' }}>{c.from.label}</span>}
+              right={<span style={{ color: '#ffc107' }}>{c.to.label}</span>}
+              leftBg={changedBg}
+              rightBg={changedBg}
               onRestore={() => restoreSingleItem('advisories', c.from.id)}
             />
           ))}
-        </DiffSection>
+        </SideBySideSection>
       )}
 
       {/* Config */}
       {(diff.config?.changed?.length ?? 0) > 0 && (
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: '#888', letterSpacing: '0.5px', marginBottom: '8px' }}>
-            CONFIG
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {diff.config.changed.map((c) => (
-              <DiffItem
-                key={c.field}
-                type="changed"
-                label={c.field}
-                description={`${c.from || '(empty)'} → ${c.to || '(empty)'}`}
-              />
-            ))}
-          </div>
-        </div>
+        <SideBySideSection title="CONFIG">
+          {diff.config.changed.map((c) => (
+            <SideBySideRow
+              key={c.field}
+              left={<span style={{ color: '#ffc107' }}>{c.field}: {c.from || '(empty)'}</span>}
+              right={<span style={{ color: '#ffc107' }}>{c.field}: {c.to || '(empty)'}</span>}
+              leftBg={changedBg}
+              rightBg={changedBg}
+            />
+          ))}
+        </SideBySideSection>
       )}
+    </div>
+  );
+}
 
-      {/* Action buttons */}
-      <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-        {totalSelected > 0 && (
-          <button style={{ ...styles.btn, background: '#00838f' }} onClick={restoreSelected}>
-            Restore Selected ({totalSelected})
+function SideBySideSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: '16px' }}>
+      <div style={{ fontSize: '11px', fontWeight: 600, color: '#888', letterSpacing: '0.5px', marginBottom: '8px' }}>
+        {title}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function SideBySideRow({ left, right, leftBg, rightBg, onRestore }: {
+  left: React.ReactNode;
+  right: React.ReactNode;
+  leftBg?: string;
+  rightBg?: string;
+  onRestore?: () => void;
+}) {
+  const cellStyle: React.CSSProperties = {
+    flex: 1,
+    padding: '8px 12px',
+    fontSize: '13px',
+    minHeight: '36px',
+    display: 'flex',
+    alignItems: 'center',
+  };
+
+  return (
+    <div style={{ display: 'flex', gap: '2px' }}>
+      <div style={{ ...cellStyle, background: leftBg || 'rgba(0,0,0,0.1)', borderRadius: '4px 0 0 4px' }}>
+        {left || <span style={{ color: '#555' }}>—</span>}
+      </div>
+      <div style={{ ...cellStyle, background: rightBg || 'rgba(0,0,0,0.1)', borderRadius: '0 4px 4px 0', justifyContent: 'space-between' }}>
+        <span>{right || <span style={{ color: '#555' }}>—</span>}</span>
+        {onRestore && (
+          <button
+            style={{ ...styles.smallBtn, background: '#4caf50', fontSize: '10px', marginLeft: '8px' }}
+            onClick={onRestore}
+          >
+            Restore
           </button>
         )}
       </div>
     </div>
   );
-}
-
-function DiffSection({ title, children, onSelectAll }: { title: string; children: React.ReactNode; onSelectAll: () => void }) {
-  return (
-    <div style={{ marginBottom: '16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-        <span style={{ fontSize: '11px', fontWeight: 600, color: '#888', letterSpacing: '0.5px' }}>{title}</span>
-        <button style={{ ...styles.smallBtn, background: '#333', fontSize: '10px' }} onClick={onSelectAll}>
-          Select All
-        </button>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>{children}</div>
-    </div>
-  );
-}
-
-interface DiffItemProps {
-  type: 'added' | 'removed' | 'changed';
-  label: string;
-  description: string;
-  checked?: boolean;
-  onToggle?: () => void;
-  onRestore?: () => void;
-}
-
-function DiffItem({ type, label, description, checked, onToggle, onRestore }: DiffItemProps) {
-  const icon = type === 'added' ? '[+]' : type === 'removed' ? '[-]' : '[~]';
-  const color = type === 'added' ? '#4caf50' : type === 'removed' ? '#f44336' : '#ffc107';
-
-  return (
-    <div style={styles.diffItem}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-        {onToggle && (
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={onToggle}
-            style={{ cursor: 'pointer' }}
-          />
-        )}
-        <span style={{ color, fontFamily: 'monospace', fontSize: '12px' }}>{icon}</span>
-        <span style={{ color: '#e0e0e0' }}>{label}</span>
-        <span style={{ color: '#666', fontSize: '12px' }}>{description}</span>
-      </div>
-      {onRestore && (
-        <button
-          style={{ ...styles.smallBtn, background: '#4caf50', fontSize: '10px' }}
-          onClick={onRestore}
-        >
-          Restore
-        </button>
-      )}
-    </div>
-  );
-}
-
-function describeServiceChange(from: Service, to: Service): string {
-  const changes: string[] = [];
-  if (from.status !== to.status) changes.push(`${from.status} → ${to.status}`);
-  if ((from.notes || '') !== (to.notes || '')) changes.push('notes changed');
-  if (from.name !== to.name) changes.push(`renamed from "${from.name}"`);
-  return changes.join(', ') || 'modified';
-}
-
-function describeEventChange(from: Event, to: Event): string {
-  const changes: string[] = [];
-  if (from.title !== to.title) changes.push('title changed');
-  if (from.subtitle !== to.subtitle) changes.push('subtitle changed');
-  if (JSON.stringify(from.details) !== JSON.stringify(to.details)) changes.push('details changed');
-  if (from.imageUrl !== to.imageUrl) changes.push('image changed');
-  return changes.join(', ') || 'modified';
-}
-
-function describeAdvisoryChange(from: Advisory, to: Advisory): string {
-  const changes: string[] = [];
-  if (from.label !== to.label) changes.push('label changed');
-  if (from.message !== to.message) changes.push('message changed');
-  if (from.active !== to.active) changes.push(to.active ? 'activated' : 'deactivated');
-  return changes.join(', ') || 'modified';
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -634,14 +541,6 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(0, 0, 0, 0.2)',
     borderRadius: '8px',
     border: '1px solid rgba(255, 255, 255, 0.05)',
-  },
-  diffItem: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '8px 12px',
-    background: 'rgba(0, 0, 0, 0.15)',
-    borderRadius: '6px',
   },
   smallBtn: {
     border: 'none',

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '../components/Header';
 import ServiceTable from '../components/ServiceTable';
 import EventCard from '../components/EventCard';
@@ -61,6 +61,7 @@ export default function Dashboard() {
       <style>{`
         html, body { overflow: hidden; height: 100%; background: #fff; }
         #root { height: 100%; }
+        *::-webkit-scrollbar { display: none; }
       `}</style>
     </div>
   );
@@ -70,7 +71,6 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
   const containerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [needsScroll, setNeedsScroll] = useState(false);
-  const isDoubledRef = useRef(false);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -78,11 +78,7 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
     if (!container || !inner) return;
 
     const check = () => {
-      // When currently doubled, estimate single-content height as half
-      const measuredHeight = inner.scrollHeight;
-      const singleHeight = isDoubledRef.current ? measuredHeight / 2 : measuredHeight;
-      const needs = singleHeight > container.clientHeight;
-      setNeedsScroll(needs);
+      setNeedsScroll(inner.scrollHeight > container.clientHeight);
     };
     check();
     const obs = new ResizeObserver(check);
@@ -91,14 +87,6 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
     return () => obs.disconnect();
   }, [events]);
 
-  // Use layout effect to reset scroll before paint (prevents visual flash)
-  useLayoutEffect(() => {
-    if (!needsScroll && containerRef.current) {
-      containerRef.current.scrollTop = 0;
-    }
-    isDoubledRef.current = needsScroll;
-  }, [needsScroll]);
-
   useEffect(() => {
     if (!needsScroll || scrollSpeed === 0) return;
     const container = containerRef.current;
@@ -106,6 +94,7 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
 
     let animId: number;
     let lastTime: number | null = null;
+    // scrollSpeed is pixels per second
     const pxPerMs = scrollSpeed / 1000;
 
     const step = (time: number) => {
@@ -113,6 +102,7 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
         const dt = time - lastTime;
         container.scrollTop += pxPerMs * dt;
 
+        // When we've scrolled past the first set, jump back to create seamless loop
         const halfScroll = container.scrollHeight / 2;
         if (container.scrollTop >= halfScroll) {
           container.scrollTop -= halfScroll;

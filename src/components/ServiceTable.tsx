@@ -62,6 +62,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '8px',
     overflow: 'hidden',
     border: '1px solid #e0d8d0',
+    flexShrink: 0,
   },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: {
