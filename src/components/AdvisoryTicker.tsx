@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Advisory } from '../types';
+import { DEFAULTS, COLORS } from '../constants';
 
-export default function AdvisoryTicker({ advisories, tickerSpeed = 25 }: { advisories: Advisory[]; tickerSpeed?: number }) {
+export default function AdvisoryTicker({ advisories, tickerSpeed = DEFAULTS.TICKER_SPEED }: { advisories: Advisory[]; tickerSpeed?: number }) {
   const active = advisories.filter(a => a.active);
   const [shouldScroll, setShouldScroll] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -54,7 +55,7 @@ export default function AdvisoryTicker({ advisories, tickerSpeed = 25 }: { advis
 
 const styles: Record<string, React.CSSProperties> = {
   ticker: {
-    background: '#f5c842',
+    background: COLORS.ADVISORY_BG,
     flexShrink: 0,
     overflow: 'hidden',
   },
@@ -74,7 +75,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginRight: '60px',
   },
   label: {
-    background: '#c0392b',
+    background: COLORS.ADVISORY_LABEL,
     color: '#fff',
     fontSize: '13px',
     fontWeight: 700,

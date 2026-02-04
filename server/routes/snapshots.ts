@@ -4,7 +4,7 @@ import { broadcast } from '../sse.js';
 
 const router = Router();
 
-// Helper to get current draft state
+// Helper to get current draft state (only includes fields needed for comparison/storage)
 async function getCurrentState() {
   const [services, events, advisories, config] = await Promise.all([
     prisma.service.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } }),
@@ -13,10 +13,37 @@ async function getCurrentState() {
     prisma.buildingConfig.findFirst(),
   ]);
   return {
-    services,
-    events: events.map(e => ({ ...e, details: JSON.parse(e.details) })),
-    advisories,
-    config,
+    services: services.map(s => ({
+      id: s.id,
+      name: s.name,
+      status: s.status,
+      notes: s.notes,
+      lastChecked: s.lastChecked.toISOString(),
+      sortOrder: s.sortOrder,
+    })),
+    events: events.map(e => ({
+      id: e.id,
+      title: e.title,
+      subtitle: e.subtitle,
+      details: JSON.parse(e.details),
+      imageUrl: e.imageUrl,
+      accentColor: e.accentColor,
+      sortOrder: e.sortOrder,
+    })),
+    advisories: advisories.map(a => ({
+      id: a.id,
+      label: a.label,
+      message: a.message,
+      active: a.active,
+    })),
+    config: config ? {
+      id: config.id,
+      buildingNumber: config.buildingNumber,
+      buildingName: config.buildingName,
+      subtitle: config.subtitle,
+      scrollSpeed: config.scrollSpeed,
+      tickerSpeed: config.tickerSpeed,
+    } : null,
   };
 }
 

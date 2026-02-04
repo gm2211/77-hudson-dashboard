@@ -3,7 +3,7 @@ import type { Service, Event, Advisory, BuildingConfig } from '../types';
 import { api } from '../utils/api';
 import { parseMarkdown } from '../utils/markdown';
 import { SnapshotHistory } from '../components/admin/SnapshotHistory';
-import { STATUS_COLORS, ADVISORY_PRESETS, IMAGE_PRESETS, CONFIG } from '../constants';
+import { STATUS_COLORS, ADVISORY_PRESETS, IMAGE_PRESETS, DEFAULTS, EVENT_CARD_GRADIENT } from '../constants';
 
 type SectionChanges = {
   config: boolean;
@@ -500,8 +500,8 @@ function EventCardPreview({ title, subtitle, imageUrl, details }: CardPreviewDat
   // Match actual EventCard component styling
   const cardStyle: React.CSSProperties = {
     background: imageUrl
-      ? `linear-gradient(to right, rgba(20,60,58,0.92) 0%, rgba(20,60,58,0.75) 50%, rgba(20,60,58,0.3) 100%), url(${imageUrl})`
-      : 'linear-gradient(135deg, #1a5c5a 0%, #1a4a48 100%)',
+      ? EVENT_CARD_GRADIENT.withImage(imageUrl)
+      : EVENT_CARD_GRADIENT.noImage,
     backgroundSize: imageUrl ? '100% 100%, cover' : undefined,
     backgroundPosition: imageUrl ? 'center, center' : undefined,
     backgroundRepeat: 'no-repeat',
@@ -647,7 +647,7 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
   const [formExpanded, setFormExpanded] = useState(false);
   const [previewEvent, setPreviewEvent] = useState<Event | null>(null);
   const [previewingForm, setPreviewingForm] = useState(false);
-  const [scrollSpeedText, setScrollSpeedText] = useState(String(config?.scrollSpeed ?? 30));
+  const [scrollSpeedText, setScrollSpeedText] = useState(String(config?.scrollSpeed ?? DEFAULTS.SCROLL_SPEED));
   const [errors, setErrors] = useState<{ title?: boolean }>({});
   const [shake, setShake] = useState(false);
 
@@ -859,7 +859,7 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
       )}
       <div style={{ marginTop: '12px' }}>
         <label style={{ color: '#e0e0e0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          Scroll duration
+          Scroll speed
           <input
             style={{ ...styles.input, width: '70px' }}
             type="number"
@@ -916,7 +916,7 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAd
   const [form, setForm] = useState(empty);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formExpanded, setFormExpanded] = useState(false);
-  const [tickerSpeedText, setTickerSpeedText] = useState(String(config?.tickerSpeed ?? 25));
+  const [tickerSpeedText, setTickerSpeedText] = useState(String(config?.tickerSpeed ?? DEFAULTS.TICKER_SPEED));
 
   const isFormOpen = formExpanded || editingId !== null;
 
@@ -1042,8 +1042,8 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAd
                       {activeChanged && (
                         <span style={{ fontSize: '10px', color: '#ffc107', opacity: 0.8 }}>{pub.active ? 'ON' : 'OFF'} →</span>
                       )}
-                      <button style={{ ...styles.smallBtn, background: a.active ? '#4caf50' : '#888' }} onClick={() => toggleActive(a)}>{a.active ? 'ON' : 'OFF'}</button>
-                      <button style={{ ...styles.smallBtn, background: isBeingEdited ? '#00838f' : '#1976d2' }} onClick={() => isBeingEdited ? cancelEdit() : startEdit(a)}>✎</button>
+                      <button style={{ ...styles.smallBtn, ...(a.active ? styles.smallBtnSuccess : {}) }} onClick={() => toggleActive(a)}>{a.active ? 'ON' : 'OFF'}</button>
+                      <button style={{ ...styles.smallBtn, ...(isBeingEdited ? styles.smallBtnInfo : styles.smallBtnPrimary) }} onClick={() => isBeingEdited ? cancelEdit() : startEdit(a)}>✎</button>
                       <button style={{ ...styles.smallBtn, ...styles.smallBtnDanger }} onClick={() => markForDeletion(a.id)}>✕</button>
                     </>
                   )}
@@ -1064,7 +1064,7 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAd
       </div>
       <div style={{ marginTop: '12px' }}>
         <label style={{ color: '#e0e0e0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          Scroll duration
+          Scroll speed
           <input
             style={{ ...styles.input, width: '70px' }}
             type="number"

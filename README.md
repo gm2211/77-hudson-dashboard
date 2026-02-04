@@ -2,82 +2,101 @@
 
 A digital signage dashboard for residential building lobbies. Displays real-time service status, upcoming events, and scrolling advisories on lobby screens.
 
-**Features:**
-- Service status board (Operational/Maintenance/Outage)
-- Event cards with images and markdown details
-- Scrolling advisory ticker
-- Admin UI with draft/publish workflow
-- Real-time updates via SSE
+## Features
 
-## Quickstart
+- **Service Status Board** — Track building services (Operational/Maintenance/Outage)
+- **Event Cards** — Announcements with images and markdown-formatted details
+- **Advisory Ticker** — Scrolling yellow banner for important notices
+- **Admin UI** — Draft/publish workflow with version history
+- **Real-time Updates** — Server-sent events for instant refresh
+
+## Quick Start
 
 Requires Node.js 18+.
 
 ```bash
-git clone <repo-url> && cd hudson-dashboard
 ./run.sh
 ```
 
-This installs deps, sets up the SQLite database, seeds sample data, and starts the server.
+This installs dependencies, sets up the SQLite database with sample data, and starts the server.
 
-- **Dashboard** (TV display): http://localhost:3000
+- **Dashboard** (lobby display): http://localhost:3000
 - **Admin panel**: http://localhost:3000/admin
 
-The dashboard auto-refreshes every 15 seconds.
+### Reset to Default Data
 
-## Using the Admin Page
+```bash
+./run.sh --reset
+```
 
-Navigate to `/admin`. There are four sections:
+This clears the database and seeds it with sample services, events, and advisories.
 
-**Building Config** — Set the building number, name, and subtitle shown in the header.
+## Admin Guide
 
-**Services** — These appear in the status table on the dashboard.
-- Add a service with a name and initial status (Operational / Maintenance / Outage).
-- Click the status badge on an existing service to cycle through states.
-- Click **✕** to delete.
+Navigate to `/admin` to manage content. Changes are saved as drafts until published.
 
-**Events** — These are the announcement cards on the right side of the dashboard.
-- Fill in title, subtitle, accent color, optional image URL, and details (one bullet point per line).
-- Click **✕** to delete.
+### Building Config
+Set the building number, name, and subtitle shown in the header.
 
-**Advisories** — The yellow scrolling banner at the bottom.
-- Add with a label (e.g. "RESIDENT ADVISORY") and message text.
-- Toggle **ON/OFF** to show or hide without deleting.
-- Click **✕** to delete.
+### Services
+The status table on the main dashboard.
+- Add services with name and status (Operational / Maintenance / Outage)
+- Add optional notes for context
+- Click status badge to change state
+- Use "Just Checked" to update the timestamp
+
+### Events
+Announcement cards displayed on the dashboard.
+- Add title, subtitle, and details (markdown supported)
+- Select a preset image or upload your own
+- Cards auto-scroll when content overflows
+
+### Advisories
+The yellow scrolling ticker at the bottom.
+- Add with label (e.g., "RESIDENT ADVISORY") and message
+- Toggle ON/OFF to show/hide without deleting
+
+### Publishing
+- **Publish** — Makes current drafts live
+- **Discard** — Reverts to last published state
+- **Preview** — See draft before publishing
+- **History** — View/restore previous versions
 
 ## Tech Stack
 
-- **Frontend**: React + Vite + TypeScript
-- **Backend**: Express (serves API + Vite dev middleware in one process)
+- **Frontend**: React 19 + Vite + TypeScript
+- **Backend**: Express (serves API + Vite dev middleware)
 - **Database**: SQLite via Prisma ORM
+- **Styling**: Inline style objects (teal/dark theme)
 
 ## Project Structure
 
 ```
 server/
-  index.ts          # Express server, Vite middleware, seed logic
+  index.ts          # Express server entry point
   db.ts             # Prisma client
-  routes/           # REST endpoints for each model
+  sse.ts            # Server-sent events for real-time updates
+  routes/           # REST API endpoints
 src/
   pages/
-    Dashboard.tsx   # TV-facing display
-    Admin.tsx       # Content management
+    Dashboard.tsx   # Lobby display (auto-scroll, real-time)
+    Admin.tsx       # Content management UI
   components/       # Header, ServiceTable, EventCard, AdvisoryTicker
+  constants/        # Shared constants (colors, defaults, presets)
+  utils/            # API client, markdown parser
 prisma/
   schema.prisma     # Data models
+  seed.ts           # Default data for --reset
 ```
 
-## Contributing
-
-### Setup
+## Development
 
 ```bash
 npm install
-npx prisma db push    # creates/updates SQLite DB
-npm run dev           # starts on :3000 with hot reload
+npm run dev
 ```
 
-### Data model changes
+### Database Changes
 
 Edit `prisma/schema.prisma`, then:
 
@@ -85,21 +104,19 @@ Edit `prisma/schema.prisma`, then:
 npx prisma db push
 ```
 
-Prisma generates types automatically — the API routes and frontend pick them up.
-
-### API routes
-
-Routes live in `server/routes/`. Each file exports an Express router with standard CRUD. Add new routes there and register them in `server/index.ts`.
-
-### Frontend
-
-React components are in `src/components/`. Pages are in `src/pages/`. Styling uses inline style objects — no CSS framework. Keep the teal/dark theme consistent (`#00bcd4` teal, `#0a1628` background, `#132038` cards).
-
-### Adding a new data type
+### Adding New Features
 
 1. Add model to `prisma/schema.prisma`
-2. Run migration
-3. Create `server/routes/yourmodel.ts` with CRUD
+2. Run `npx prisma db push`
+3. Create route in `server/routes/`
 4. Register in `server/index.ts`
 5. Add types to `src/types.ts`
-6. Build UI components and wire them into Dashboard/Admin
+6. Build UI components
+
+## Configuration
+
+Scroll speeds and ticker speeds are configurable in the Admin UI:
+- Higher numbers = slower scrolling
+- Set to 0 to stop scrolling
+
+Default values are defined in `src/constants/config.ts`.

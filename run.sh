@@ -33,12 +33,12 @@ npx prisma generate
 if [ "$RESET_DB" = true ]; then
   echo "Resetting database to default state..."
   rm -f prisma/dev.db prisma/dev.db-journal
-  npx prisma migrate dev --name init --skip-seed
+  npx prisma db push
   echo "Seeding database..."
   npx tsx prisma/seed.ts
 elif [ ! -f "prisma/dev.db" ]; then
   echo "Setting up database..."
-  npx prisma migrate dev --name init --skip-seed
+  npx prisma db push
   echo "Seeding database..."
   npx tsx prisma/seed.ts
 fi

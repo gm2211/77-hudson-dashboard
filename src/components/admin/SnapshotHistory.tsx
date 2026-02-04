@@ -113,7 +113,7 @@ export function SnapshotHistory({ onRestore }: SnapshotHistoryProps) {
         <h2 style={{ ...styles.sectionTitle, margin: 0 }}>Version History</h2>
         {historicalSnapshots.length > 0 && (
           <button
-            style={{ ...styles.smallBtn, background: '#b71c1c', fontSize: '11px' }}
+            style={{ ...styles.smallBtn, ...styles.smallBtnDanger, fontSize: '11px' }}
             onClick={purgeAllHistory}
           >
             Purge Old Versions
@@ -138,25 +138,25 @@ export function SnapshotHistory({ onRestore }: SnapshotHistoryProps) {
               </div>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button
-                  style={{ ...styles.smallBtn, background: '#1976d2' }}
+                  style={{ ...styles.smallBtn, ...styles.smallBtnPrimary }}
                   onClick={() => setPreviewVersion(s.version)}
                 >
                   Preview
                 </button>
                 <button
-                  style={{ ...styles.smallBtn, background: selectedVersion === s.version ? '#00838f' : '#444' }}
+                  style={{ ...styles.smallBtn, ...(selectedVersion === s.version ? styles.smallBtnInfo : {}) }}
                   onClick={() => loadDiff(s.version)}
                 >
                   {selectedVersion === s.version ? 'Hide Diff' : 'Diff'}
                 </button>
                 <button
-                  style={{ ...styles.smallBtn, background: '#4caf50' }}
+                  style={{ ...styles.smallBtn, ...styles.smallBtnSuccess }}
                   onClick={() => restoreFull(s.version)}
                 >
                   Restore All
                 </button>
                 <button
-                  style={{ ...styles.smallBtn, background: '#b71c1c' }}
+                  style={{ ...styles.smallBtn, ...styles.smallBtnDanger }}
                   onClick={() => deleteSnapshot(s.version)}
                   title="Delete this snapshot"
                 >
@@ -215,7 +215,7 @@ export function SnapshotHistory({ onRestore }: SnapshotHistoryProps) {
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
-                    style={{ ...styles.smallBtn, background: '#4caf50' }}
+                    style={{ ...styles.smallBtn, ...styles.smallBtnSuccess }}
                     onClick={() => {
                       restoreFull(previewVersion);
                       setPreviewVersion(null);
@@ -223,7 +223,7 @@ export function SnapshotHistory({ onRestore }: SnapshotHistoryProps) {
                   >
                     Restore This Version
                   </button>
-                  <button style={{ ...styles.smallBtn, background: '#555' }} onClick={() => setPreviewVersion(null)}>
+                  <button style={styles.smallBtn} onClick={() => setPreviewVersion(null)}>
                     Close
                   </button>
                 </div>
@@ -465,7 +465,7 @@ function SideBySideRow({ left, right, leftBg, rightBg, onRestore }: {
         <span>{right || <span style={{ color: '#555' }}>—</span>}</span>
         {onRestore && (
           <button
-            style={{ ...styles.smallBtn, background: '#4caf50', fontSize: '10px', marginLeft: '8px' }}
+            style={{ ...styles.smallBtn, ...styles.smallBtnSuccess, fontSize: '10px', marginLeft: '8px' }}
             onClick={onRestore}
           >
             Restore
@@ -543,20 +543,32 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(255, 255, 255, 0.05)',
   },
   smallBtn: {
-    border: 'none',
     borderRadius: '4px',
     padding: '4px 10px',
-    color: '#fff',
     cursor: 'pointer',
     fontSize: '12px',
+    background: 'linear-gradient(135deg, #2a3a50 0%, #1a2535 100%)',
+    color: '#a0b0c0',
+    border: '1px solid #3a4a60',
   },
-  btn: {
-    background: '#00838f',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '6px',
-    padding: '8px 16px',
-    cursor: 'pointer',
-    fontWeight: 600,
+  smallBtnPrimary: {
+    background: 'linear-gradient(135deg, #2a4a6a 0%, #1a3050 100%)',
+    color: '#a0c8e8',
+    border: '1px solid #3a5a7a',
+  },
+  smallBtnInfo: {
+    background: 'linear-gradient(135deg, #1a5a5a 0%, #0d3d3d 100%)',
+    color: '#a0d8d8',
+    border: '1px solid #2a7a7a',
+  },
+  smallBtnSuccess: {
+    background: 'linear-gradient(135deg, #2a5a3a 0%, #1a3d28 100%)',
+    color: '#a0e8b0',
+    border: '1px solid #3a7a4a',
+  },
+  smallBtnDanger: {
+    background: 'linear-gradient(135deg, #5a2a2a 0%, #3d1a1a 100%)',
+    color: '#e8a0a0',
+    border: '1px solid #7a3a3a',
   },
 };

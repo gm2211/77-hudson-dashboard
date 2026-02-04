@@ -3,6 +3,7 @@ import Header from '../components/Header';
 import ServiceTable from '../components/ServiceTable';
 import EventCard from '../components/EventCard';
 import AdvisoryTicker from '../components/AdvisoryTicker';
+import { DEFAULTS } from '../constants';
 import type { Service, Event, Advisory, BuildingConfig } from '../types';
 
 export default function Dashboard() {
@@ -47,8 +48,8 @@ export default function Dashboard() {
     return () => es.close();
   }, [fetchAll]);
 
-  const scrollSpeed = config?.scrollSpeed ?? 30;
-  const tickerSpeed = config?.tickerSpeed ?? 25;
+  const scrollSpeed = config?.scrollSpeed ?? DEFAULTS.SCROLL_SPEED;
+  const tickerSpeed = config?.tickerSpeed ?? DEFAULTS.TICKER_SPEED;
 
   return (
     <div style={styles.page}>
@@ -95,6 +96,10 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
     let animId: number;
     let lastTime: number | null = null;
 
+    // Start at bottom half for seamless loop (scroll direction: top to bottom)
+    const contentHeight = container.scrollHeight / 2;
+    container.scrollTop = contentHeight;
+
     const step = (time: number) => {
       if (lastTime !== null) {
         const dt = time - lastTime;
@@ -102,11 +107,11 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
         // higher number = slower, matching the advisory ticker behavior
         const contentHeight = container.scrollHeight / 2;
         const pxPerMs = contentHeight / (scrollSpeed * 1000);
-        container.scrollTop += pxPerMs * dt;
+        container.scrollTop -= pxPerMs * dt;
 
-        // When we've scrolled past the first set, jump back to create seamless loop
-        if (container.scrollTop >= contentHeight) {
-          container.scrollTop -= contentHeight;
+        // When we've scrolled to the top, jump back to bottom for seamless loop
+        if (container.scrollTop <= 0) {
+          container.scrollTop += contentHeight;
         }
       }
       lastTime = time;
