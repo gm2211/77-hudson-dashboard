@@ -23,7 +23,7 @@ async function main() {
     },
   });
 
-  // Create services
+  // Create services (10+ with some non-operational)
   const services = await Promise.all([
     prisma.service.create({
       data: { name: 'Elevators', status: 'Operational', sortOrder: 0 },
@@ -32,7 +32,7 @@ async function main() {
       data: { name: 'HVAC', status: 'Operational', sortOrder: 1 },
     }),
     prisma.service.create({
-      data: { name: 'Hot Water', status: 'Operational', sortOrder: 2 },
+      data: { name: 'Hot Water', status: 'Maintenance', notes: 'Boiler maintenance until 3pm', sortOrder: 2 },
     }),
     prisma.service.create({
       data: { name: 'Parking Garage', status: 'Operational', sortOrder: 3 },
@@ -40,44 +40,68 @@ async function main() {
     prisma.service.create({
       data: { name: 'Package Room', status: 'Operational', notes: 'Open 7am-10pm', sortOrder: 4 },
     }),
+    prisma.service.create({
+      data: { name: 'Gym', status: 'Operational', notes: '24/7 access', sortOrder: 5 },
+    }),
+    prisma.service.create({
+      data: { name: 'Pool', status: 'Maintenance', notes: 'Closed for cleaning, reopens tomorrow', sortOrder: 6 },
+    }),
+    prisma.service.create({
+      data: { name: 'Rooftop Lounge', status: 'Operational', sortOrder: 7 },
+    }),
+    prisma.service.create({
+      data: { name: 'Laundry Room', status: 'Operational', sortOrder: 8 },
+    }),
+    prisma.service.create({
+      data: { name: 'Bike Storage', status: 'Outage', notes: 'Key card reader malfunction - use side entrance', sortOrder: 9 },
+    }),
+    prisma.service.create({
+      data: { name: 'Guest Parking', status: 'Operational', sortOrder: 10 },
+    }),
+    prisma.service.create({
+      data: { name: 'Concierge', status: 'Operational', notes: '8am-8pm daily', sortOrder: 11 },
+    }),
   ]);
 
-  // Create events
+  // Create events using the 3 built-in images
   const events = await Promise.all([
     prisma.event.create({
       data: {
-        title: 'Rooftop Social',
-        subtitle: 'Friday, 6:00 PM',
+        title: 'Morning Yoga',
+        subtitle: 'Saturday, 9:00 AM',
         details: JSON.stringify([
-          'Join your neighbors for drinks and appetizers on the rooftop terrace.',
-          '**RSVP required** - Sign up at the front desk by Thursday.',
+          'Start your weekend with a relaxing yoga session on the rooftop.',
+          'All levels welcome. Mats provided.',
+          '**RSVP at front desk**',
         ]),
-        imageUrl: '/preset-rooftop.jpg',
+        imageUrl: '/images/yoga.jpg',
         sortOrder: 0,
       },
     }),
     prisma.event.create({
       data: {
-        title: 'Yoga in the Park',
-        subtitle: 'Saturday, 9:00 AM',
+        title: 'Bagel Brunch',
+        subtitle: 'Sunday, 10:00 AM',
         details: JSON.stringify([
-          'Free yoga session at Hudson River Park.',
-          'Bring your own mat. All levels welcome.',
+          'Join us in the community room for fresh bagels and coffee.',
+          'Assorted cream cheeses and toppings available.',
+          'Great way to meet your neighbors!',
         ]),
-        imageUrl: '/preset-yoga.jpg',
+        imageUrl: '/images/bagels.jpg',
         sortOrder: 1,
       },
     }),
     prisma.event.create({
       data: {
-        title: 'Wine Tasting Night',
-        subtitle: 'Next Wednesday, 7:00 PM',
+        title: 'Tequila Tasting Night',
+        subtitle: 'Friday, 7:00 PM',
         details: JSON.stringify([
-          'Sample wines from local vineyards.',
-          '$25 per person - includes cheese pairings.',
-          'Limited to 30 guests.',
+          'Sample premium tequilas from Mexico.',
+          'Light appetizers included.',
+          '$20 per person - **21+ only**',
+          'Limited to 25 guests.',
         ]),
-        imageUrl: '/preset-wine.jpg',
+        imageUrl: '/images/tequila.jpg',
         sortOrder: 2,
       },
     }),
@@ -90,6 +114,7 @@ async function main() {
           'Please disregard alarms during this time.',
           'Contact management with questions.',
         ]),
+        imageUrl: '',
         sortOrder: 3,
       },
     }),
@@ -113,7 +138,8 @@ async function main() {
     }),
   ]);
 
-  // Create initial published snapshot
+  // Create published snapshot that exactly matches current state
+  // This ensures no "pending changes" appear in admin UI
   const state = {
     services: services.map(s => ({
       id: s.id,
@@ -159,7 +185,7 @@ async function main() {
   console.log(`  - ${services.length} services`);
   console.log(`  - ${events.length} events`);
   console.log(`  - ${advisories.length} advisories`);
-  console.log(`  - 1 published snapshot`);
+  console.log(`  - 1 published snapshot (no pending changes)`);
 }
 
 main()
