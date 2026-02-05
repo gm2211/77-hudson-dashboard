@@ -40,12 +40,13 @@ model Advisory {
 }
 
 model BuildingConfig {
-  id             Int    @id @default(autoincrement())
-  buildingNumber String @default("77")
-  buildingName   String @default("Hudson Dashboard")
-  subtitle       String @default("Real-time System Monitor")
-  scrollSpeed    Int    @default(30)
-  tickerSpeed    Int    @default(25)
+  id                   Int    @id @default(autoincrement())
+  buildingNumber       String @default("77")
+  buildingName         String @default("Hudson Dashboard")
+  subtitle             String @default("Real-time System Monitor")
+  scrollSpeed          Int    @default(30)
+  tickerSpeed          Int    @default(25)
+  servicesScrollSpeed  Int    @default(8)
 }
 
 model PublishedSnapshot {

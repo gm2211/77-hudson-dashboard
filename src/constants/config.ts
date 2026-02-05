@@ -2,6 +2,7 @@
 export const DEFAULTS = {
   SCROLL_SPEED: 30,
   TICKER_SPEED: 25,
+  SERVICES_SCROLL_SPEED: 8,
 } as const;
 
 // Theme colors

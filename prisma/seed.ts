@@ -20,6 +20,7 @@ async function main() {
       subtitle: 'Building Services Dashboard',
       scrollSpeed: 50,
       tickerSpeed: 30,
+      servicesScrollSpeed: 8,
     },
   });
 
@@ -140,36 +141,43 @@ async function main() {
 
   // Create published snapshot that exactly matches current state
   // This ensures no "pending changes" appear in admin UI
+  // Using section-based format: each section has items + its config
   const state = {
-    services: services.map(s => ({
-      id: s.id,
-      name: s.name,
-      status: s.status,
-      notes: s.notes,
-      lastChecked: s.lastChecked.toISOString(),
-      sortOrder: s.sortOrder,
-    })),
-    events: events.map(e => ({
-      id: e.id,
-      title: e.title,
-      subtitle: e.subtitle,
-      details: JSON.parse(e.details),
-      imageUrl: e.imageUrl,
-      accentColor: e.accentColor,
-      sortOrder: e.sortOrder,
-    })),
-    advisories: advisories.map(a => ({
-      id: a.id,
-      label: a.label,
-      message: a.message,
-      active: a.active,
-    })),
     config: {
-      id: config.id,
       buildingNumber: config.buildingNumber,
       buildingName: config.buildingName,
       subtitle: config.subtitle,
+    },
+    services: {
+      items: services.map(s => ({
+        id: s.id,
+        name: s.name,
+        status: s.status,
+        notes: s.notes,
+        lastChecked: s.lastChecked.toISOString(),
+        sortOrder: s.sortOrder,
+      })),
+      scrollSpeed: config.servicesScrollSpeed,
+    },
+    events: {
+      items: events.map(e => ({
+        id: e.id,
+        title: e.title,
+        subtitle: e.subtitle,
+        details: JSON.parse(e.details),
+        imageUrl: e.imageUrl,
+        accentColor: e.accentColor,
+        sortOrder: e.sortOrder,
+      })),
       scrollSpeed: config.scrollSpeed,
+    },
+    advisories: {
+      items: advisories.map(a => ({
+        id: a.id,
+        label: a.label,
+        message: a.message,
+        active: a.active,
+      })),
       tickerSpeed: config.tickerSpeed,
     },
   };

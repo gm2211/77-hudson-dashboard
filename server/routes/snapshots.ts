@@ -4,7 +4,8 @@ import { broadcast } from '../sse.js';
 
 const router = Router();
 
-// Helper to get current draft state (only includes fields needed for comparison/storage)
+// Helper to get current draft state organized by section
+// Each section contains its items + any config that affects it
 async function getCurrentState() {
   const [services, events, advisories, config] = await Promise.all([
     prisma.service.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } }),
@@ -12,38 +13,49 @@ async function getCurrentState() {
     prisma.advisory.findMany({ where: { deletedAt: null } }),
     prisma.buildingConfig.findFirst(),
   ]);
+
   return {
-    services: services.map(s => ({
-      id: s.id,
-      name: s.name,
-      status: s.status,
-      notes: s.notes,
-      lastChecked: s.lastChecked.toISOString(),
-      sortOrder: s.sortOrder,
-    })),
-    events: events.map(e => ({
-      id: e.id,
-      title: e.title,
-      subtitle: e.subtitle,
-      details: JSON.parse(e.details),
-      imageUrl: e.imageUrl,
-      accentColor: e.accentColor,
-      sortOrder: e.sortOrder,
-    })),
-    advisories: advisories.map(a => ({
-      id: a.id,
-      label: a.label,
-      message: a.message,
-      active: a.active,
-    })),
+    // Config section: building identity fields
     config: config ? {
-      id: config.id,
       buildingNumber: config.buildingNumber,
       buildingName: config.buildingName,
       subtitle: config.subtitle,
-      scrollSpeed: config.scrollSpeed,
-      tickerSpeed: config.tickerSpeed,
     } : null,
+    // Services section: service items + services scroll speed
+    services: {
+      items: services.map(s => ({
+        id: s.id,
+        name: s.name,
+        status: s.status,
+        notes: s.notes,
+        lastChecked: s.lastChecked.toISOString(),
+        sortOrder: s.sortOrder,
+      })),
+      scrollSpeed: config?.servicesScrollSpeed ?? 8,
+    },
+    // Events section: event items + events scroll speed
+    events: {
+      items: events.map(e => ({
+        id: e.id,
+        title: e.title,
+        subtitle: e.subtitle,
+        details: JSON.parse(e.details),
+        imageUrl: e.imageUrl,
+        accentColor: e.accentColor,
+        sortOrder: e.sortOrder,
+      })),
+      scrollSpeed: config?.scrollSpeed ?? 30,
+    },
+    // Advisories section: advisory items + ticker speed
+    advisories: {
+      items: advisories.map(a => ({
+        id: a.id,
+        label: a.label,
+        message: a.message,
+        active: a.active,
+      })),
+      tickerSpeed: config?.tickerSpeed ?? 25,
+    },
   };
 }
 
@@ -51,6 +63,21 @@ async function getCurrentState() {
 async function getNextVersion(): Promise<number> {
   const latest = await prisma.publishedSnapshot.findFirst({ orderBy: { version: 'desc' } });
   return (latest?.version ?? 0) + 1;
+}
+
+// Transform internal section-based format to flat API format for frontend compatibility
+function toApiFormat(state: any) {
+  return {
+    services: state.services.items,
+    events: state.events.items,
+    advisories: state.advisories.items,
+    config: state.config ? {
+      ...state.config,
+      scrollSpeed: state.events.scrollSpeed,
+      tickerSpeed: state.advisories.tickerSpeed,
+      servicesScrollSpeed: state.services.scrollSpeed,
+    } : null,
+  };
 }
 
 // GET /api/snapshots - List all snapshots (version, publishedAt)
@@ -66,9 +93,9 @@ router.get('/', async (_req, res) => {
 router.get('/latest', async (_req, res) => {
   const snapshot = await prisma.publishedSnapshot.findFirst({ orderBy: { version: 'desc' } });
   if (!snapshot) {
-    return res.json(await getCurrentState());
+    return res.json(toApiFormat(await getCurrentState()));
   }
-  res.json(JSON.parse(snapshot.data));
+  res.json(toApiFormat(JSON.parse(snapshot.data)));
 });
 
 // GET /api/snapshots/draft-status - Get draft vs latest diff (replaces /api/draft-status)
@@ -85,54 +112,46 @@ router.get('/draft-status', async (_req, res) => {
   const current = await getCurrentState();
   const published = JSON.parse(snapshot.data);
 
-  // Compare only the editable fields for config
-  const configFields = (() => {
-    if (!current.config && !published.config) return { buildingChanged: false, scrollSpeedChanged: false, tickerSpeedChanged: false };
-    if (!current.config || !published.config) return { buildingChanged: true, scrollSpeedChanged: true, tickerSpeedChanged: true };
-    return {
-      buildingChanged: (
-        String(current.config.buildingNumber || '') !== String(published.config.buildingNumber || '') ||
-        String(current.config.buildingName || '') !== String(published.config.buildingName || '') ||
-        String(current.config.subtitle || '') !== String(published.config.subtitle || '')
-      ),
-      scrollSpeedChanged: Number(current.config.scrollSpeed) !== Number(published.config.scrollSpeed),
-      tickerSpeedChanged: Number(current.config.tickerSpeed) !== Number(published.config.tickerSpeed),
-    };
-  })();
+  // Normalize a section for comparison (handles items with markedForDeletion and excludes operational fields)
+  const normalizeSection = (section: any, excludeFields: string[] = []) => {
+    if (!section) return null;
+    const { items, ...config } = section;
+    const normalizedItems = (items || [])
+      .filter((item: any) => !item.markedForDeletion)
+      .map((item: any) => {
+        const normalized = { ...item };
+        excludeFields.forEach(f => delete normalized[f]);
+        return normalized;
+      })
+      .sort((a: any, b: any) => a.id - b.id); // Sort by id for consistent comparison
+    return { items: normalizedItems, ...config };
+  };
 
-  // Check for items marked for deletion
-  const hasMarkedServices = current.services.some((s: any) => s.markedForDeletion);
-  const hasMarkedEvents = current.events.some((e: any) => e.markedForDeletion);
-  const hasMarkedAdvisories = current.advisories.some((a: any) => a.markedForDeletion);
+  // Check if any items are marked for deletion (these count as changes even if items match)
+  const hasMarkedServices = current.services.items.some((s: any) => s.markedForDeletion);
+  const hasMarkedEvents = current.events.items.some((e: any) => e.markedForDeletion);
+  const hasMarkedAdvisories = current.advisories.items.some((a: any) => a.markedForDeletion);
 
-  // Normalize services comparison
-  const normalizeService = (s: any) => ({
-    id: s.id,
-    name: s.name,
-    status: s.status,
-    notes: s.notes || '',
-    lastChecked: s.lastChecked,
-    sortOrder: s.sortOrder,
-  });
-  const currentServicesNormalized = current.services.filter((s: any) => !s.markedForDeletion).map(normalizeService);
-  const publishedServicesNormalized = (published.services || []).map(normalizeService);
+  // Normalize and compare each section generically
+  // Services: exclude lastChecked (operational data, not content)
+  const currentServicesNorm = normalizeSection(current.services, ['lastChecked']);
+  const publishedServicesNorm = normalizeSection(published.services, ['lastChecked']);
 
-  // Filter out marked items before comparing
-  const currentEventsFiltered = current.events.filter((e: any) => !e.markedForDeletion);
-  const currentAdvisoriesFiltered = current.advisories.filter((a: any) => !a.markedForDeletion);
+  const currentEventsNorm = normalizeSection(current.events);
+  const publishedEventsNorm = normalizeSection(published.events);
 
-  const eventsChanged = JSON.stringify(currentEventsFiltered) !== JSON.stringify(published.events);
-  const advisoriesChanged = JSON.stringify(currentAdvisoriesFiltered) !== JSON.stringify(published.advisories);
+  const currentAdvisoriesNorm = normalizeSection(current.advisories);
+  const publishedAdvisoriesNorm = normalizeSection(published.advisories);
 
   const sectionChanges = {
-    config: configFields.buildingChanged,
-    services: hasMarkedServices || JSON.stringify(currentServicesNormalized) !== JSON.stringify(publishedServicesNormalized),
-    events: hasMarkedEvents || eventsChanged || configFields.scrollSpeedChanged,
-    advisories: hasMarkedAdvisories || advisoriesChanged || configFields.tickerSpeedChanged,
+    config: JSON.stringify(current.config) !== JSON.stringify(published.config),
+    services: hasMarkedServices || JSON.stringify(currentServicesNorm) !== JSON.stringify(publishedServicesNorm),
+    events: hasMarkedEvents || JSON.stringify(currentEventsNorm) !== JSON.stringify(publishedEventsNorm),
+    advisories: hasMarkedAdvisories || JSON.stringify(currentAdvisoriesNorm) !== JSON.stringify(publishedAdvisoriesNorm),
   };
 
   const hasChanges = Object.values(sectionChanges).some(Boolean);
-  res.json({ hasChanges, sectionChanges, published });
+  res.json({ hasChanges, sectionChanges, published: toApiFormat(published) });
 });
 
 // GET /api/snapshots/:version - Get specific snapshot data
@@ -142,7 +161,7 @@ router.get('/:version(\\d+)', async (req, res) => {
   if (!snapshot) {
     return res.status(404).json({ error: 'Snapshot not found' });
   }
-  res.json({ ...JSON.parse(snapshot.data), version: snapshot.version, publishedAt: snapshot.publishedAt });
+  res.json({ ...toApiFormat(JSON.parse(snapshot.data)), version: snapshot.version, publishedAt: snapshot.publishedAt });
 });
 
 // GET /api/snapshots/:v1/diff/:v2 - Get diff between two snapshots
@@ -174,7 +193,7 @@ router.get('/:v1(\\d+)/diff/:v2', async (req, res) => {
   res.json(diff);
 });
 
-// Helper function to compute diff between two snapshots
+// Helper function to compute diff between two snapshots (using new section-based format)
 function computeDiff(from: any, to: any) {
   const diff: {
     services: { added: any[]; removed: any[]; changed: any[] };
@@ -188,9 +207,9 @@ function computeDiff(from: any, to: any) {
     config: { changed: [] },
   };
 
-  // Services diff
-  const fromServicesMap = new Map((from.services || []).map((s: any) => [s.id, s]));
-  const toServicesMap = new Map((to.services || []).filter((s: any) => !s.markedForDeletion).map((s: any) => [s.id, s]));
+  // Services diff (items are in .items now)
+  const fromServicesMap = new Map((from.services?.items || []).map((s: any) => [s.id, s]));
+  const toServicesMap = new Map((to.services?.items || []).filter((s: any) => !s.markedForDeletion).map((s: any) => [s.id, s]));
 
   for (const [id, service] of toServicesMap) {
     if (!fromServicesMap.has(id)) {
@@ -208,9 +227,9 @@ function computeDiff(from: any, to: any) {
     }
   }
 
-  // Events diff
-  const fromEventsMap = new Map((from.events || []).map((e: any) => [e.id, e]));
-  const toEventsMap = new Map((to.events || []).filter((e: any) => !e.markedForDeletion).map((e: any) => [e.id, e]));
+  // Events diff (items are in .items now)
+  const fromEventsMap = new Map((from.events?.items || []).map((e: any) => [e.id, e]));
+  const toEventsMap = new Map((to.events?.items || []).filter((e: any) => !e.markedForDeletion).map((e: any) => [e.id, e]));
 
   for (const [id, event] of toEventsMap) {
     if (!fromEventsMap.has(id)) {
@@ -229,9 +248,9 @@ function computeDiff(from: any, to: any) {
     }
   }
 
-  // Advisories diff
-  const fromAdvisoriesMap = new Map((from.advisories || []).map((a: any) => [a.id, a]));
-  const toAdvisoriesMap = new Map((to.advisories || []).filter((a: any) => !a.markedForDeletion).map((a: any) => [a.id, a]));
+  // Advisories diff (items are in .items now)
+  const fromAdvisoriesMap = new Map((from.advisories?.items || []).map((a: any) => [a.id, a]));
+  const toAdvisoriesMap = new Map((to.advisories?.items || []).filter((a: any) => !a.markedForDeletion).map((a: any) => [a.id, a]));
 
   for (const [id, advisory] of toAdvisoriesMap) {
     if (!fromAdvisoriesMap.has(id)) {
@@ -249,22 +268,26 @@ function computeDiff(from: any, to: any) {
     }
   }
 
-  // Config diff
+  // Config diff - compare building config fields
   const fromConfig = from.config || {};
   const toConfig = to.config || {};
-  const configFields = [
-    { key: 'buildingNumber', label: 'Building Number' },
-    { key: 'buildingName', label: 'Building Name' },
-    { key: 'subtitle', label: 'Subtitle' },
-    { key: 'scrollSpeed', label: 'Scroll Speed' },
-    { key: 'tickerSpeed', label: 'Ticker Speed' },
-  ];
-  for (const { key, label } of configFields) {
+  for (const key of Object.keys({ ...fromConfig, ...toConfig })) {
     const fromVal = fromConfig[key] ?? '';
     const toVal = toConfig[key] ?? '';
     if (String(fromVal) !== String(toVal)) {
-      diff.config.changed.push({ field: label, from: fromVal, to: toVal });
+      diff.config.changed.push({ field: key, from: fromVal, to: toVal });
     }
+  }
+
+  // Also include scroll speed changes in the diff
+  if ((from.services?.scrollSpeed ?? 8) !== (to.services?.scrollSpeed ?? 8)) {
+    diff.config.changed.push({ field: 'Services Page Speed', from: from.services?.scrollSpeed ?? 8, to: to.services?.scrollSpeed ?? 8 });
+  }
+  if ((from.events?.scrollSpeed ?? 30) !== (to.events?.scrollSpeed ?? 30)) {
+    diff.config.changed.push({ field: 'Events Scroll Speed', from: from.events?.scrollSpeed ?? 30, to: to.events?.scrollSpeed ?? 30 });
+  }
+  if ((from.advisories?.tickerSpeed ?? 25) !== (to.advisories?.tickerSpeed ?? 25)) {
+    diff.config.changed.push({ field: 'Ticker Speed', from: from.advisories?.tickerSpeed ?? 25, to: to.advisories?.tickerSpeed ?? 25 });
   }
 
   return diff;
@@ -292,9 +315,8 @@ router.post('/', async (_req, res) => {
   });
 
   broadcast();
-  // Return the published state so client can use it directly
-  // This ensures events and published.events are identical (same object)
-  res.json({ ok: true, version, state });
+  // Return the published state in API format so client can use it directly
+  res.json({ ok: true, version, state: toApiFormat(state) });
 });
 
 // POST /api/snapshots/discard - Discard draft changes (replaces /api/discard)
@@ -310,10 +332,10 @@ router.post('/discard', async (_req, res) => {
     await tx.event.deleteMany();
     await tx.advisory.deleteMany();
 
-    // Restore from snapshot
-    if (data.services?.length) {
+    // Restore from snapshot (using new section-based format)
+    if (data.services?.items?.length) {
       await tx.service.createMany({
-        data: data.services.map((s: any) => ({
+        data: data.services.items.map((s: any) => ({
           id: s.id,
           name: s.name,
           status: s.status,
@@ -323,9 +345,9 @@ router.post('/discard', async (_req, res) => {
         })),
       });
     }
-    if (data.events?.length) {
+    if (data.events?.items?.length) {
       await tx.event.createMany({
-        data: data.events.map((e: any) => ({
+        data: data.events.items.map((e: any) => ({
           id: e.id,
           title: e.title,
           subtitle: e.subtitle,
@@ -336,9 +358,9 @@ router.post('/discard', async (_req, res) => {
         })),
       });
     }
-    if (data.advisories?.length) {
+    if (data.advisories?.items?.length) {
       await tx.advisory.createMany({
-        data: data.advisories.map((a: any) => ({
+        data: data.advisories.items.map((a: any) => ({
           id: a.id,
           label: a.label,
           message: a.message,
@@ -346,20 +368,20 @@ router.post('/discard', async (_req, res) => {
         })),
       });
     }
-    if (data.config) {
-      const existing = await tx.buildingConfig.findFirst();
-      if (existing) {
-        await tx.buildingConfig.update({
-          where: { id: existing.id },
-          data: {
-            buildingNumber: data.config.buildingNumber,
-            buildingName: data.config.buildingName,
-            subtitle: data.config.subtitle,
-            scrollSpeed: data.config.scrollSpeed,
-            tickerSpeed: data.config.tickerSpeed,
-          },
-        });
-      }
+    // Restore config from building config + section scroll speeds
+    const existing = await tx.buildingConfig.findFirst();
+    if (existing) {
+      await tx.buildingConfig.update({
+        where: { id: existing.id },
+        data: {
+          buildingNumber: data.config?.buildingNumber ?? existing.buildingNumber,
+          buildingName: data.config?.buildingName ?? existing.buildingName,
+          subtitle: data.config?.subtitle ?? existing.subtitle,
+          scrollSpeed: data.events?.scrollSpeed ?? 30,
+          tickerSpeed: data.advisories?.tickerSpeed ?? 25,
+          servicesScrollSpeed: data.services?.scrollSpeed ?? 8,
+        },
+      });
     }
   });
 
@@ -382,10 +404,10 @@ router.post('/restore/:version', async (req, res) => {
     await tx.event.deleteMany();
     await tx.advisory.deleteMany();
 
-    // Restore from snapshot
-    if (data.services?.length) {
+    // Restore from snapshot (using new section-based format)
+    if (data.services?.items?.length) {
       await tx.service.createMany({
-        data: data.services.map((s: any) => ({
+        data: data.services.items.map((s: any) => ({
           id: s.id,
           name: s.name,
           status: s.status,
@@ -395,9 +417,9 @@ router.post('/restore/:version', async (req, res) => {
         })),
       });
     }
-    if (data.events?.length) {
+    if (data.events?.items?.length) {
       await tx.event.createMany({
-        data: data.events.map((e: any) => ({
+        data: data.events.items.map((e: any) => ({
           id: e.id,
           title: e.title,
           subtitle: e.subtitle,
@@ -408,9 +430,9 @@ router.post('/restore/:version', async (req, res) => {
         })),
       });
     }
-    if (data.advisories?.length) {
+    if (data.advisories?.items?.length) {
       await tx.advisory.createMany({
-        data: data.advisories.map((a: any) => ({
+        data: data.advisories.items.map((a: any) => ({
           id: a.id,
           label: a.label,
           message: a.message,
@@ -418,20 +440,20 @@ router.post('/restore/:version', async (req, res) => {
         })),
       });
     }
-    if (data.config) {
-      const existing = await tx.buildingConfig.findFirst();
-      if (existing) {
-        await tx.buildingConfig.update({
-          where: { id: existing.id },
-          data: {
-            buildingNumber: data.config.buildingNumber,
-            buildingName: data.config.buildingName,
-            subtitle: data.config.subtitle,
-            scrollSpeed: data.config.scrollSpeed,
-            tickerSpeed: data.config.tickerSpeed,
-          },
-        });
-      }
+    // Restore config from building config + section scroll speeds
+    const existing = await tx.buildingConfig.findFirst();
+    if (existing) {
+      await tx.buildingConfig.update({
+        where: { id: existing.id },
+        data: {
+          buildingNumber: data.config?.buildingNumber ?? existing.buildingNumber,
+          buildingName: data.config?.buildingName ?? existing.buildingName,
+          subtitle: data.config?.subtitle ?? existing.subtitle,
+          scrollSpeed: data.events?.scrollSpeed ?? 30,
+          tickerSpeed: data.advisories?.tickerSpeed ?? 25,
+          servicesScrollSpeed: data.services?.scrollSpeed ?? 8,
+        },
+      });
     }
   });
 
@@ -466,10 +488,10 @@ router.post('/restore-items', async (req, res) => {
   };
 
   await prisma.$transaction(async (tx) => {
-    // Restore selected services
+    // Restore selected services (items are in .items now)
     if (items.services?.length) {
       for (const id of items.services) {
-        const service = data.services?.find((s: any) => s.id === id);
+        const service = data.services?.items?.find((s: any) => s.id === id);
         if (service) {
           // Delete existing if present
           await tx.service.deleteMany({ where: { id } });
@@ -489,10 +511,10 @@ router.post('/restore-items', async (req, res) => {
       }
     }
 
-    // Restore selected events
+    // Restore selected events (items are in .items now)
     if (items.events?.length) {
       for (const id of items.events) {
-        const event = data.events?.find((e: any) => e.id === id);
+        const event = data.events?.items?.find((e: any) => e.id === id);
         if (event) {
           await tx.event.deleteMany({ where: { id } });
           await tx.event.create({
@@ -511,10 +533,10 @@ router.post('/restore-items', async (req, res) => {
       }
     }
 
-    // Restore selected advisories
+    // Restore selected advisories (items are in .items now)
     if (items.advisories?.length) {
       for (const id of items.advisories) {
-        const advisory = data.advisories?.find((a: any) => a.id === id);
+        const advisory = data.advisories?.items?.find((a: any) => a.id === id);
         if (advisory) {
           await tx.advisory.deleteMany({ where: { id } });
           await tx.advisory.create({

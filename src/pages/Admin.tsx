@@ -115,7 +115,7 @@ export default function Admin() {
         </header>
 
         <ConfigSection config={config} onSave={onConfigSave} hasChanged={sectionChanges.config} publishedConfig={published?.config || null} />
-        <ServicesSection services={services} onSave={onSave} hasChanged={sectionChanges.services} publishedServices={published?.services || null} />
+        <ServicesSection services={services} config={config} onSave={onSave} hasChanged={sectionChanges.services} publishedServices={published?.services || null} />
         <EventsSection events={events} config={config} onSave={onSave} hasChanged={sectionChanges.events} publishedEvents={published?.events || null} />
         <AdvisoriesSection advisories={advisories} config={config} onSave={onSave} hasChanged={sectionChanges.advisories} publishedAdvisories={published?.advisories || null} />
       </div>
@@ -247,12 +247,24 @@ function ConfigSection({ config, onSave, hasChanged, publishedConfig }: { config
   );
 }
 
-function ServicesSection({ services, onSave, hasChanged, publishedServices }: { services: Service[]; onSave: () => void; hasChanged: boolean; publishedServices: Service[] | null }) {
+function ServicesSection({ services, config, onSave, hasChanged, publishedServices }: { services: Service[]; config: BuildingConfig | null; onSave: () => void; hasChanged: boolean; publishedServices: Service[] | null }) {
   const [name, setName] = useState('');
   const [status, setStatus] = useState('Operational');
   const [formExpanded, setFormExpanded] = useState(false);
   const [expandedNotes, setExpandedNotes] = useState<number | null>(null);
   const [editingNotes, setEditingNotes] = useState<Record<number, string>>({});
+  const [servicesScrollSpeedText, setServicesScrollSpeedText] = useState(String(config?.servicesScrollSpeed ?? DEFAULTS.SERVICES_SCROLL_SPEED));
+
+  useEffect(() => {
+    if (config) setServicesScrollSpeedText(String(config.servicesScrollSpeed));
+  }, [config]);
+
+  const saveServicesScrollSpeed = async (text: string) => {
+    const val = text === '' ? 0 : Math.max(0, Number(text));
+    setServicesScrollSpeedText(String(val));
+    await api.put('/api/config', { servicesScrollSpeed: val });
+    onSave();
+  };
 
   const add = async () => {
     if (!name) return;
@@ -282,16 +294,6 @@ function ServicesSection({ services, onSave, hasChanged, publishedServices }: { 
     onSave();
   };
 
-  const setLastCheckedNow = async (s: Service) => {
-    await api.put(`/api/services/${s.id}`, { lastChecked: new Date().toISOString() });
-    onSave();
-  };
-
-  const formatLastChecked = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-  };
-
   const getPublishedService = (id: number): Service | undefined => {
     return publishedServices?.find(ps => ps.id === id);
   };
@@ -308,124 +310,184 @@ function ServicesSection({ services, onSave, hasChanged, publishedServices }: { 
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <input style={styles.input} placeholder="Service name" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') add(); }} autoFocus />
             <StatusSelect value={status} onChange={setStatus} />
-            <button style={styles.btn} onClick={add}>Add Service to Draft</button>
-            <button style={{ ...styles.btn, background: '#555' }} onClick={() => { setFormExpanded(false); setName(''); }}>Close</button>
+            <button style={styles.btn} onClick={add}>Add</button>
+            <button style={{ ...styles.btn, background: '#555' }} onClick={() => { setFormExpanded(false); setName(''); }}>Cancel</button>
           </div>
         </div>
       ) : (
         <button
-          style={{ ...styles.btn, width: '100%', marginBottom: '16px' }}
+          style={{ ...styles.btn, width: '100%', marginBottom: '12px' }}
           onClick={() => setFormExpanded(true)}
         >
-          + Add New Service Status
+          + Add Service
         </button>
       )}
       {services.length > 0 && (
-        <div style={styles.listHeader}>
-          <span>Current Services</span>
-          <span style={{ fontSize: '11px', color: '#666' }}>{services.length} item{services.length !== 1 ? 's' : ''}</span>
-        </div>
-      )}
-      <div>
-        {services.map(s => {
-          const pub = getPublishedService(s.id);
-          const isNewDraft = !pub;
-          const isMarkedForDeletion = s.markedForDeletion;
-          const statusChanged = pub && pub.status !== s.status;
-          const timeChanged = pub && pub.lastChecked !== s.lastChecked;
-          const notesChanged = pub && (s.notes || '') !== (pub.notes || '');
-          const nameChanged = pub && pub.name !== s.name;
-          const hasChanges = !isMarkedForDeletion && !isNewDraft && (timeChanged || notesChanged || nameChanged);
-          const isExpanded = expandedNotes === s.id && !isMarkedForDeletion;
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(120px, 1fr) 110px auto auto',
+          gap: '0',
+          fontSize: '13px',
+          background: 'rgba(0, 0, 0, 0.15)',
+          borderRadius: '8px',
+          border: '1px solid rgba(255, 255, 255, 0.03)',
+          overflow: 'hidden',
+        }}>
+          {/* Header row */}
+          <div style={{ padding: '8px 12px', background: 'rgba(0, 0, 0, 0.2)', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Service</div>
+          <div style={{ padding: '8px 12px', background: 'rgba(0, 0, 0, 0.2)', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</div>
+          <div style={{ padding: '8px 12px', background: 'rgba(0, 0, 0, 0.2)', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Notes</div>
+          <div style={{ padding: '8px 12px', background: 'rgba(0, 0, 0, 0.2)', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'right' }}></div>
 
-          return (
-            <div key={s.id} style={{ ...styles.listCard, ...(isMarkedForDeletion ? styles.markedForDeletion : {}), ...(hasChanges ? styles.itemChanged : {}) }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '12px', ...(isMarkedForDeletion ? { textDecoration: 'line-through', opacity: 0.5 } : {}) }}>
-                    {isNewDraft && !isMarkedForDeletion && <span style={styles.draftIndicator} title="New draft item">●</span>}
-                    {isMarkedForDeletion && <span style={{ color: '#f44336', fontSize: '10px' }} title="Will be deleted on publish">🗑</span>}
-                    <span style={{ fontWeight: 500 }}>{s.name}</span>
-                    <span style={{ fontSize: '11px', color: '#888' }}>
-                      Last: {formatLastChecked(s.lastChecked)}
-                      {timeChanged && !isMarkedForDeletion && (
-                        <span style={styles.changedValue}> was {formatLastChecked(pub.lastChecked)}</span>
-                      )}
-                    </span>
-                    {s.notes && !isExpanded && (
-                      <span style={{ fontSize: '10px', color: '#666', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        "{s.notes}"
-                      </span>
-                    )}
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {isMarkedForDeletion ? (
-                      <button style={{ ...styles.smallBtn, ...styles.smallBtnSuccess }} onClick={() => unmarkForDeletion(s.id)}>Undo</button>
-                    ) : (
-                      <>
-                        <button
-                          style={{ ...styles.smallBtn, ...(isExpanded ? styles.smallBtnInfo : {}), fontSize: '10px' }}
-                          onClick={() => setExpandedNotes(isExpanded ? null : s.id)}
-                          title={s.notes ? 'Edit note' : 'Add note'}
-                        >
-                          {s.notes ? '📝' : '+ Note'}
-                        </button>
-                        <button style={{ ...styles.smallBtn, fontSize: '10px' }} onClick={() => setLastCheckedNow(s)} title="Mark as just checked">Just Checked</button>
-                        {statusChanged && (
-                          <span style={{ fontSize: '10px', opacity: 0.8, color: STATUS_COLORS[pub.status] }}>{pub.status} →</span>
-                        )}
-                        <StatusSelect value={s.status} onChange={v => changeStatus(s, v)} style={{ padding: '4px 8px', fontSize: '12px' }} />
-                        <button style={{ ...styles.smallBtn, ...styles.smallBtnDanger }} onClick={() => markForDeletion(s.id)}>✕</button>
-                      </>
-                    )}
-                  </span>
+          {services.map(s => {
+            const pub = getPublishedService(s.id);
+            const isNewDraft = !pub;
+            const isMarkedForDeletion = s.markedForDeletion;
+            const statusChanged = pub && pub.status !== s.status;
+            const notesChanged = pub && (s.notes || '') !== (pub.notes || '');
+            const hasItemChanges = !isMarkedForDeletion && !isNewDraft && (notesChanged);
+            const isExpanded = expandedNotes === s.id && !isMarkedForDeletion;
+            const rowStyle: React.CSSProperties = {
+              ...(isMarkedForDeletion ? { background: 'rgba(244, 67, 54, 0.1)' } : {}),
+              ...(hasItemChanges ? { background: 'rgba(255, 193, 7, 0.08)' } : {}),
+            };
+
+            return (
+              <div key={s.id} style={{ display: 'contents' }}>
+                {/* Service name */}
+                <div style={{
+                  padding: '8px 12px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.03)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  ...(isMarkedForDeletion ? { textDecoration: 'line-through', opacity: 0.5 } : {}),
+                  ...rowStyle,
+                }}>
+                  {isNewDraft && !isMarkedForDeletion && <span style={styles.draftIndicator} title="New draft item">●</span>}
+                  {isMarkedForDeletion && <span style={{ color: '#f44336', fontSize: '10px' }} title="Will be deleted on publish">🗑</span>}
+                  <span style={{ fontWeight: 500 }}>{s.name}</span>
                 </div>
-                {isExpanded && (
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <input
-                      style={{ ...styles.input, flex: 1, fontSize: '12px', padding: '6px 10px' }}
-                      placeholder="Add a note about this service status..."
-                      value={editingNotes[s.id] ?? s.notes ?? ''}
-                      onChange={e => setEditingNotes({ ...editingNotes, [s.id]: e.target.value })}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          const newNotes = editingNotes[s.id] ?? s.notes ?? '';
-                          if (newNotes !== (s.notes || '')) {
+
+                {/* Status */}
+                <div style={{
+                  padding: '6px 8px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.03)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  ...rowStyle,
+                }}>
+                  {isMarkedForDeletion ? (
+                    <span style={{ color: STATUS_COLORS[s.status], opacity: 0.5 }}>{s.status}</span>
+                  ) : (
+                    <>
+                      {statusChanged && (
+                        <span style={{ fontSize: '9px', opacity: 0.7, color: STATUS_COLORS[pub.status] }}>{pub.status}→</span>
+                      )}
+                      <StatusSelect value={s.status} onChange={v => changeStatus(s, v)} style={{ padding: '2px 4px', fontSize: '11px', flex: 1 }} />
+                    </>
+                  )}
+                </div>
+
+                {/* Notes */}
+                <div style={{
+                  padding: '6px 8px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.03)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  minWidth: 0,
+                  ...rowStyle,
+                }}>
+                  {isMarkedForDeletion ? (
+                    <span style={{ fontSize: '11px', color: '#666', opacity: 0.5 }}>{s.notes || '—'}</span>
+                  ) : isExpanded ? (
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flex: 1 }}>
+                      <input
+                        style={{ ...styles.input, flex: 1, fontSize: '11px', padding: '4px 8px' }}
+                        placeholder="Note..."
+                        value={editingNotes[s.id] ?? s.notes ?? ''}
+                        onChange={e => setEditingNotes({ ...editingNotes, [s.id]: e.target.value })}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            const newNotes = editingNotes[s.id] ?? s.notes ?? '';
                             updateNotes(s, newNotes);
                             setEditingNotes(prev => { const copy = { ...prev }; delete copy[s.id]; return copy; });
+                            setExpandedNotes(null);
+                          } else if (e.key === 'Escape') {
+                            setEditingNotes(prev => { const copy = { ...prev }; delete copy[s.id]; return copy; });
+                            setExpandedNotes(null);
                           }
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        style={{ ...styles.smallBtn, padding: '2px 6px', fontSize: '10px', marginLeft: 0 }}
+                        onClick={() => {
+                          const newNotes = editingNotes[s.id] ?? s.notes ?? '';
+                          updateNotes(s, newNotes);
+                          setEditingNotes(prev => { const copy = { ...prev }; delete copy[s.id]; return copy; });
                           setExpandedNotes(null);
-                        }
+                        }}
+                      >✓</button>
+                    </div>
+                  ) : (
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        color: s.notes ? '#999' : '#555',
+                        cursor: 'pointer',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        flex: 1,
                       }}
-                      autoFocus
-                    />
-                    <button
-                      style={{ ...styles.smallBtn, ...styles.smallBtnInfo }}
-                      onClick={() => {
-                        const newNotes = editingNotes[s.id] ?? s.notes ?? '';
-                        updateNotes(s, newNotes);
-                        setEditingNotes(prev => { const copy = { ...prev }; delete copy[s.id]; return copy; });
-                        setExpandedNotes(null);
-                      }}
+                      onClick={() => setExpandedNotes(s.id)}
+                      title={s.notes || 'Click to add note'}
                     >
-                      Save
-                    </button>
-                    <button
-                      style={styles.smallBtn}
-                      onClick={() => {
-                        setEditingNotes(prev => { const copy = { ...prev }; delete copy[s.id]; return copy; });
-                        setExpandedNotes(null);
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    {notesChanged && <span style={{ fontSize: '10px', color: '#ffc107' }}>changed</span>}
-                  </div>
-                )}
+                      {s.notes || '+ note'}
+                      {notesChanged && <span style={{ color: '#ffc107', marginLeft: '4px' }}>*</span>}
+                    </span>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div style={{
+                  padding: '6px 8px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.03)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  gap: '4px',
+                  ...rowStyle,
+                }}>
+                  {isMarkedForDeletion ? (
+                    <button style={{ ...styles.smallBtn, ...styles.smallBtnSuccess, padding: '2px 8px', fontSize: '10px', marginLeft: 0 }} onClick={() => unmarkForDeletion(s.id)}>Undo</button>
+                  ) : (
+                    <button style={{ ...styles.smallBtn, ...styles.smallBtnDanger, padding: '2px 6px', fontSize: '10px', marginLeft: 0 }} onClick={() => markForDeletion(s.id)}>✕</button>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+      )}
+      <div style={{ marginTop: '12px' }}>
+        <label style={{ color: '#e0e0e0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          Page speed
+          <input
+            style={{ ...styles.input, width: '70px' }}
+            type="number"
+            min="0"
+            value={servicesScrollSpeedText}
+            onChange={e => {
+              setServicesScrollSpeedText(e.target.value);
+              saveServicesScrollSpeed(e.target.value);
+            }}
+            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+          />
+          seconds (0 = stopped)
+        </label>
       </div>
     </section>
   );
