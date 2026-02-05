@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Snapshot, SnapshotDiff, Service, Event, Advisory } from '../../types';
 import { api } from '../../utils/api';
+import {
+  smallBtn, smallBtnDanger, smallBtnSuccess, smallBtnPrimary, smallBtnInfo,
+  modalOverlay, modal,
+} from '../../styles';
 
 interface SnapshotHistoryProps {
   onRestore: () => void;
@@ -120,7 +124,7 @@ export function SnapshotHistory({ onRestore, onItemRestore }: SnapshotHistoryPro
         <h2 style={{ ...styles.sectionTitle, margin: 0 }}>Version History</h2>
         {historicalSnapshots.length > 0 && (
           <button
-            style={{ ...styles.smallBtn, ...styles.smallBtnDanger, fontSize: '11px' }}
+            style={{ ...smallBtn, ...smallBtnDanger, fontSize: '11px' }}
             onClick={purgeAllHistory}
           >
             Purge Old Versions
@@ -148,19 +152,19 @@ export function SnapshotHistory({ onRestore, onItemRestore }: SnapshotHistoryPro
               </div>
               <div style={{ display: 'flex', gap: '6px' }} onClick={e => e.stopPropagation()}>
                 <button
-                  style={{ ...styles.smallBtn, ...styles.smallBtnPrimary }}
+                  style={{ ...smallBtn, ...smallBtnPrimary }}
                   onClick={() => setPreviewVersion(s.version)}
                 >
                   Preview
                 </button>
                 <button
-                  style={{ ...styles.smallBtn, ...styles.smallBtnSuccess }}
+                  style={{ ...smallBtn, ...smallBtnSuccess }}
                   onClick={() => restoreFull(s.version)}
                 >
                   Restore All
                 </button>
                 <button
-                  style={{ ...styles.smallBtn, ...styles.smallBtnDanger }}
+                  style={{ ...smallBtn, ...smallBtnDanger }}
                   onClick={() => deleteSnapshot(s.version)}
                   title="Delete this snapshot"
                 >
@@ -197,7 +201,7 @@ export function SnapshotHistory({ onRestore, onItemRestore }: SnapshotHistoryPro
         const hasPrev = currentIndex < snapshots.length - 1;
         const hasNext = currentIndex > 0;
         return (
-          <div style={styles.modalOverlay} onClick={() => setPreviewVersion(null)}>
+          <div style={modalOverlay} onClick={() => setPreviewVersion(null)}>
             {/* Left arrow */}
             <button
               style={{
@@ -213,7 +217,7 @@ export function SnapshotHistory({ onRestore, onItemRestore }: SnapshotHistoryPro
               ←
             </button>
 
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <div style={modal} onClick={e => e.stopPropagation()}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <strong style={{ color: '#e0e0e0' }}>Preview — Version {previewVersion}</strong>
@@ -221,7 +225,7 @@ export function SnapshotHistory({ onRestore, onItemRestore }: SnapshotHistoryPro
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
-                    style={{ ...styles.smallBtn, ...styles.smallBtnSuccess }}
+                    style={{ ...smallBtn, ...smallBtnSuccess }}
                     onClick={() => {
                       restoreFull(previewVersion);
                       setPreviewVersion(null);
@@ -229,7 +233,7 @@ export function SnapshotHistory({ onRestore, onItemRestore }: SnapshotHistoryPro
                   >
                     Restore This Version
                   </button>
-                  <button style={styles.smallBtn} onClick={() => setPreviewVersion(null)}>
+                  <button style={smallBtn} onClick={() => setPreviewVersion(null)}>
                     Close
                   </button>
                 </div>
@@ -475,7 +479,7 @@ function SideBySideRow({ left, right, leftBg, rightBg, onRestore }: {
         <span>{right || <span style={{ color: '#555' }}>—</span>}</span>
         {onRestore && (
           <button
-            style={{ ...styles.smallBtn, ...styles.smallBtnSuccess, fontSize: '10px', marginLeft: '8px' }}
+            style={{ ...smallBtn, ...smallBtnSuccess, fontSize: '10px', marginLeft: '8px' }}
             onClick={onRestore}
           >
             Restore
@@ -552,33 +556,5 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '8px',
     border: '1px solid rgba(255, 255, 255, 0.05)',
   },
-  smallBtn: {
-    borderRadius: '4px',
-    padding: '4px 10px',
-    cursor: 'pointer',
-    fontSize: '12px',
-    background: 'linear-gradient(135deg, #2a3a50 0%, #1a2535 100%)',
-    color: '#a0b0c0',
-    border: '1px solid #3a4a60',
-  },
-  smallBtnPrimary: {
-    background: 'linear-gradient(135deg, #2a4a6a 0%, #1a3050 100%)',
-    color: '#a0c8e8',
-    border: '1px solid #3a5a7a',
-  },
-  smallBtnInfo: {
-    background: 'linear-gradient(135deg, #1a5a5a 0%, #0d3d3d 100%)',
-    color: '#a0d8d8',
-    border: '1px solid #2a7a7a',
-  },
-  smallBtnSuccess: {
-    background: 'linear-gradient(135deg, #2a5a3a 0%, #1a3d28 100%)',
-    color: '#a0e8b0',
-    border: '1px solid #3a7a4a',
-  },
-  smallBtnDanger: {
-    background: 'linear-gradient(135deg, #5a2a2a 0%, #3d1a1a 100%)',
-    color: '#e8a0a0',
-    border: '1px solid #7a3a3a',
-  },
+  // Button styles (smallBtn*) are now imported from ../../styles
 };

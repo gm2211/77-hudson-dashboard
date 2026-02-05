@@ -4,6 +4,11 @@ import { api } from '../utils/api';
 import { parseMarkdown } from '../utils/markdown';
 import { SnapshotHistory } from '../components/admin/SnapshotHistory';
 import { STATUS_COLORS, ADVISORY_PRESETS, IMAGE_PRESETS, DEFAULTS, EVENT_CARD_GRADIENT } from '../constants';
+import {
+  smallBtn, smallBtnDanger, smallBtnSuccess, smallBtnPrimary, smallBtnInfo,
+  headerBtn, headerBtnSecondary, btn,
+  modalOverlay, modal,
+} from '../styles';
 
 type SectionChanges = {
   config: boolean;
@@ -101,15 +106,15 @@ export default function Admin() {
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <button
               style={{
-                ...styles.headerBtn,
+                ...headerBtn,
                 ...(hasChanges ? {} : { opacity: 0.5, cursor: 'not-allowed' }),
               }}
               onClick={hasChanges ? publish : undefined}
               disabled={!hasChanges}
             >Publish</button>
-            <button style={{ ...styles.headerBtn, ...styles.headerBtnSecondary }} onClick={discard}>Discard</button>
-            <button style={{ ...styles.headerBtn, ...styles.headerBtnSecondary }} onClick={() => setPreviewOpen(true)}>Preview</button>
-            <button style={{ ...styles.headerBtn, ...styles.headerBtnSecondary }} onClick={() => setHistoryOpen(true)}>History</button>
+            <button style={{ ...headerBtn, ...headerBtnSecondary }} onClick={discard}>Discard</button>
+            <button style={{ ...headerBtn, ...headerBtnSecondary }} onClick={() => setPreviewOpen(true)}>Preview</button>
+            <button style={{ ...headerBtn, ...headerBtnSecondary }} onClick={() => setHistoryOpen(true)}>History</button>
             <a href="/" style={styles.link}>← Dashboard</a>
           </div>
         </header>
@@ -121,11 +126,11 @@ export default function Admin() {
       </div>
 
       {previewOpen && (
-        <div style={styles.modalOverlay} onClick={() => setPreviewOpen(false)}>
-          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+        <div style={modalOverlay} onClick={() => setPreviewOpen(false)}>
+          <div style={modal} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
               <strong style={{ color: '#e0e0e0' }}>Preview (Draft)</strong>
-              <button style={styles.smallBtn} onClick={() => setPreviewOpen(false)}>Close</button>
+              <button style={smallBtn} onClick={() => setPreviewOpen(false)}>Close</button>
             </div>
             <iframe src="/?preview=true" style={{ width: '100%', height: '100%', border: 'none', borderRadius: '8px' }} />
           </div>
@@ -133,11 +138,11 @@ export default function Admin() {
       )}
 
       {historyOpen && (
-        <div style={styles.modalOverlay} onClick={() => setHistoryOpen(false)}>
-          <div style={{ ...styles.modal, width: '700px', maxWidth: '90vw', height: 'auto', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+        <div style={modalOverlay} onClick={() => setHistoryOpen(false)}>
+          <div style={{ ...modal, width: '700px', maxWidth: '90vw', height: 'auto', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
               <strong style={{ color: '#e0e0e0' }}>Version History</strong>
-              <button style={styles.smallBtn} onClick={() => setHistoryOpen(false)}>Close</button>
+              <button style={smallBtn} onClick={() => setHistoryOpen(false)}>Close</button>
             </div>
             <SnapshotHistory onRestore={() => { onSave(); setHistoryOpen(false); }} onItemRestore={onSave} />
           </div>
@@ -310,13 +315,13 @@ function ServicesSection({ services, config, onSave, hasChanged, publishedServic
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <input style={styles.input} placeholder="Service name" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') add(); }} autoFocus />
             <StatusSelect value={status} onChange={setStatus} />
-            <button style={styles.btn} onClick={add}>Add</button>
-            <button style={{ ...styles.btn, background: '#555' }} onClick={() => { setFormExpanded(false); setName(''); }}>Cancel</button>
+            <button style={btn} onClick={add}>Add</button>
+            <button style={{ ...btn, background: '#555' }} onClick={() => { setFormExpanded(false); setName(''); }}>Cancel</button>
           </div>
         </div>
       ) : (
         <button
-          style={{ ...styles.btn, width: '100%', marginBottom: '12px' }}
+          style={{ ...btn, width: '100%', marginBottom: '12px' }}
           onClick={() => setFormExpanded(true)}
         >
           + Add Service
@@ -431,7 +436,7 @@ function ServicesSection({ services, config, onSave, hasChanged, publishedServic
                         autoFocus
                       />
                       <button
-                        style={{ ...styles.smallBtn, padding: '2px 6px', fontSize: '10px', marginLeft: 0 }}
+                        style={{ ...smallBtn, padding: '2px 6px', fontSize: '10px', marginLeft: 0 }}
                         onClick={() => {
                           const newNotes = editingNotes[s.id] ?? s.notes ?? '';
                           updateNotes(s, newNotes);
@@ -469,9 +474,9 @@ function ServicesSection({ services, config, onSave, hasChanged, publishedServic
                   gap: '4px',
                 }}>
                   {isMarkedForDeletion ? (
-                    <button style={{ ...styles.smallBtn, ...styles.smallBtnSuccess, padding: '2px 8px', fontSize: '10px', marginLeft: 0 }} onClick={() => unmarkForDeletion(s.id)}>Undo</button>
+                    <button style={{ ...smallBtn, ...smallBtnSuccess, padding: '2px 8px', fontSize: '10px', marginLeft: 0 }} onClick={() => unmarkForDeletion(s.id)}>Undo</button>
                   ) : (
-                    <button style={{ ...styles.smallBtn, ...styles.smallBtnDanger, padding: '2px 6px', fontSize: '10px', marginLeft: 0 }} onClick={() => markForDeletion(s.id)}>✕</button>
+                    <button style={{ ...smallBtn, ...smallBtnDanger, padding: '2px 6px', fontSize: '10px', marginLeft: 0 }} onClick={() => markForDeletion(s.id)}>✕</button>
                   )}
                 </div>
               </div>
@@ -551,7 +556,7 @@ function ImagePicker({ value, onChange, label }: { value: string; onChange: (v: 
               onChange={e => onChange(e.target.value)}
             />
             <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleUpload} />
-            <button style={styles.smallBtn} onClick={() => fileRef.current?.click()}>Upload</button>
+            <button style={smallBtn} onClick={() => fileRef.current?.click()}>Upload</button>
           </>
         )}
       </div>
@@ -796,7 +801,7 @@ function MarkdownEditor({ value, onChange, placeholder, cardPreview }: { value: 
         <span style={{ fontSize: '12px', color: '#888' }}>Details (markdown supported)</span>
         <button
           type="button"
-          style={{ ...styles.smallBtn, ...(showPreview ? styles.smallBtnInfo : {}), marginLeft: 'auto' }}
+          style={{ ...smallBtn, ...(showPreview ? smallBtnInfo : {}), marginLeft: 'auto' }}
           onClick={() => setShowPreview(!showPreview)}
         >
           {showPreview ? 'Edit' : (cardPreview ? 'Preview Card' : 'Preview')}
@@ -948,15 +953,15 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
               cardPreview={{ title: form.title, subtitle: form.subtitle, imageUrl: form.imageUrl }}
             />
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button style={styles.btn} onClick={submit}>{editingId ? 'Save Draft' : 'Add Event to Draft'}</button>
-              <button style={{ ...styles.btn, background: '#00838f' }} onClick={() => setPreviewingForm(true)}>Preview</button>
-              <button style={{ ...styles.btn, background: '#555' }} onClick={cancelEdit}>{editingId ? 'Cancel' : 'Close'}</button>
+              <button style={btn} onClick={submit}>{editingId ? 'Save Draft' : 'Add Event to Draft'}</button>
+              <button style={{ ...btn, background: '#00838f' }} onClick={() => setPreviewingForm(true)}>Preview</button>
+              <button style={{ ...btn, background: '#555' }} onClick={cancelEdit}>{editingId ? 'Cancel' : 'Close'}</button>
             </div>
           </div>
         </div>
       ) : (
         <button
-          style={{ ...styles.btn, width: '100%', marginBottom: '16px' }}
+          style={{ ...btn, width: '100%', marginBottom: '16px' }}
           onClick={() => setFormExpanded(true)}
         >
           + Add New Event
@@ -964,7 +969,7 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
       )}
 
       {previewingForm && (
-        <div style={styles.modalOverlay} onClick={() => setPreviewingForm(false)}>
+        <div style={modalOverlay} onClick={() => setPreviewingForm(false)}>
           <div onClick={ev => ev.stopPropagation()} style={{ position: 'relative' }}>
             <EventCardPreview
               title={form.title || 'Untitled Event'}
@@ -973,7 +978,7 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
               details={form.details}
             />
             <button
-              style={{ ...styles.smallBtn, position: 'absolute', top: '-8px', right: '-8px', background: '#555' }}
+              style={{ ...smallBtn, position: 'absolute', top: '-8px', right: '-8px', background: '#555' }}
               onClick={() => setPreviewingForm(false)}
             >✕</button>
           </div>
@@ -1028,12 +1033,12 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
               </div>
               <span style={{ display: 'flex', gap: '4px' }}>
                 {isMarkedForDeletion ? (
-                  <button style={{ ...styles.smallBtn, ...styles.smallBtnSuccess }} onClick={() => unmarkForDeletion(e.id)}>Undo</button>
+                  <button style={{ ...smallBtn, ...smallBtnSuccess }} onClick={() => unmarkForDeletion(e.id)}>Undo</button>
                 ) : (
                   <>
-                    <button style={{ ...styles.smallBtn, ...styles.smallBtnInfo, fontSize: '10px' }} onClick={() => setPreviewEvent(e)}>Preview</button>
-                    <button style={{ ...styles.smallBtn, ...styles.smallBtnPrimary }} onClick={() => startEdit(e)} title="Edit">✎</button>
-                    <button style={{ ...styles.smallBtn, ...styles.smallBtnDanger }} onClick={() => markForDeletion(e.id)} title="Delete">✕</button>
+                    <button style={{ ...smallBtn, ...smallBtnInfo, fontSize: '10px' }} onClick={() => setPreviewEvent(e)}>Preview</button>
+                    <button style={{ ...smallBtn, ...smallBtnPrimary }} onClick={() => startEdit(e)} title="Edit">✎</button>
+                    <button style={{ ...smallBtn, ...smallBtnDanger }} onClick={() => markForDeletion(e.id)} title="Delete">✕</button>
                   </>
                 )}
               </span>
@@ -1043,7 +1048,7 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
       </div>
 
       {previewEvent && (
-        <div style={styles.modalOverlay} onClick={() => setPreviewEvent(null)}>
+        <div style={modalOverlay} onClick={() => setPreviewEvent(null)}>
           <div onClick={e => e.stopPropagation()} style={{ position: 'relative' }}>
             <EventCardPreview
               title={previewEvent.title}
@@ -1052,7 +1057,7 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
               details={previewEvent.details.join('\n')}
             />
             <button
-              style={{ ...styles.smallBtn, position: 'absolute', top: '-8px', right: '-8px', background: '#555' }}
+              style={{ ...smallBtn, position: 'absolute', top: '-8px', right: '-8px', background: '#555' }}
               onClick={() => setPreviewEvent(null)}
             >✕</button>
           </div>
@@ -1196,13 +1201,13 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAd
                 onKeyDown={e => { if (e.key === 'Enter') submit(); }}
               />
             </div>
-            <button style={styles.btn} onClick={submit}>{editingId ? 'Save Draft' : 'Add Advisory to Draft'}</button>
-            <button style={{ ...styles.btn, background: '#555' }} onClick={cancelEdit}>{editingId ? 'Cancel' : 'Close'}</button>
+            <button style={btn} onClick={submit}>{editingId ? 'Save Draft' : 'Add Advisory to Draft'}</button>
+            <button style={{ ...btn, background: '#555' }} onClick={cancelEdit}>{editingId ? 'Cancel' : 'Close'}</button>
           </div>
         </div>
       ) : (
         <button
-          style={{ ...styles.btn, width: '100%', marginBottom: '16px' }}
+          style={{ ...btn, width: '100%', marginBottom: '16px' }}
           onClick={() => setFormExpanded(true)}
         >
           + Add New Advisory
@@ -1245,7 +1250,7 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAd
                 </div>
                 <span style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                   {isMarkedForDeletion ? (
-                    <button style={{ ...styles.smallBtn, ...styles.smallBtnSuccess }} onClick={() => unmarkForDeletion(a.id)}>Undo</button>
+                    <button style={{ ...smallBtn, ...smallBtnSuccess }} onClick={() => unmarkForDeletion(a.id)}>Undo</button>
                   ) : (
                     <>
                       {activeChanged && (
@@ -1265,8 +1270,8 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAd
                           transform: a.active ? 'translateX(16px)' : 'translateX(0)',
                         }} />
                       </button>
-                      <button style={{ ...styles.smallBtn, ...(isBeingEdited ? styles.smallBtnInfo : styles.smallBtnPrimary) }} onClick={() => isBeingEdited ? cancelEdit() : startEdit(a)}>✎</button>
-                      <button style={{ ...styles.smallBtn, ...styles.smallBtnDanger }} onClick={() => markForDeletion(a.id)}>✕</button>
+                      <button style={{ ...smallBtn, ...(isBeingEdited ? smallBtnInfo : smallBtnPrimary) }} onClick={() => isBeingEdited ? cancelEdit() : startEdit(a)}>✎</button>
+                      <button style={{ ...smallBtn, ...smallBtnDanger }} onClick={() => markForDeletion(a.id)}>✕</button>
                     </>
                   )}
                 </span>
@@ -1396,55 +1401,8 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'transform 0.2s',
     boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
   },
-  btn: { background: '#00838f', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 16px', cursor: 'pointer', fontWeight: 600 },
-  headerBtn: {
-    background: 'linear-gradient(135deg, #1a5a3a 0%, #0d3d28 100%)',
-    color: '#a8e6cf',
-    border: '1px solid #2a7a5a',
-    borderRadius: '6px',
-    padding: '8px 16px',
-    cursor: 'pointer',
-    fontWeight: 600,
-    fontSize: '13px',
-    minWidth: '80px',
-  },
-  headerBtnSecondary: {
-    background: 'linear-gradient(135deg, #1a3050 0%, #0d1f35 100%)',
-    color: '#8ab4d4',
-    border: '1px solid #2a4060',
-  },
-  smallBtn: {
-    borderRadius: '4px',
-    padding: '4px 10px',
-    cursor: 'pointer',
-    fontSize: '12px',
-    marginLeft: '6px',
-    background: 'linear-gradient(135deg, #2a3a50 0%, #1a2535 100%)',
-    color: '#a0b0c0',
-    border: '1px solid #3a4a60',
-  },
-  smallBtnDanger: {
-    background: 'linear-gradient(135deg, #5a2a2a 0%, #3d1a1a 100%)',
-    color: '#e8a0a0',
-    border: '1px solid #7a3a3a',
-  },
-  smallBtnSuccess: {
-    background: 'linear-gradient(135deg, #2a5a3a 0%, #1a3d28 100%)',
-    color: '#a0e8b0',
-    border: '1px solid #3a7a4a',
-  },
-  smallBtnPrimary: {
-    background: 'linear-gradient(135deg, #2a4a6a 0%, #1a3050 100%)',
-    color: '#a0c8e8',
-    border: '1px solid #3a5a7a',
-  },
-  smallBtnInfo: {
-    background: 'linear-gradient(135deg, #1a5a5a 0%, #0d3d3d 100%)',
-    color: '#a0d8d8',
-    border: '1px solid #2a7a7a',
-  },
+  // Button styles (btn, headerBtn*, smallBtn*) are now imported from ../styles
+  // Modal styles (modalOverlay, modal) are now imported from ../styles
   list: { listStyle: 'none', padding: 0 },
   listItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #1a3050' },
-  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
-  modal: { width: '90vw', height: '85vh', background: '#132038', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column' },
 };

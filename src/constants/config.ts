@@ -48,3 +48,78 @@ export const TIMING = {
   DEBOUNCE_MS: 150,
   ANIMATION_SHAKE_MS: 400,
 } as const;
+
+/**
+ * Design tokens for consistent spacing throughout the UI.
+ *
+ * AI AGENT NOTE: Always prefer these tokens over raw pixel values.
+ * Use the smallest token that provides adequate visual separation.
+ *
+ * USAGE:
+ * ```tsx
+ * <div style={{ gap: SPACING.SM, padding: SPACING.MD }}>
+ * ```
+ */
+export const SPACING = {
+  /** 4px - Minimal spacing, icon/text alignment */
+  XS: '4px',
+  /** 8px - Default gap between elements */
+  SM: '8px',
+  /** 12px - Input padding, form spacing */
+  MD: '12px',
+  /** 16px - Section gaps, card padding */
+  LG: '16px',
+  /** 20px - Major section separation */
+  XL: '20px',
+  /** 24px - Page padding, large gaps */
+  XXL: '24px',
+} as const;
+
+/**
+ * Typography scale for consistent font sizes.
+ *
+ * AI AGENT NOTE: BASE (13px) is the default body text size.
+ * Use SM/XS for secondary text, LG/XL for headings.
+ */
+export const FONT_SIZE = {
+  /** 10px - Tiny labels, badges */
+  XS: '10px',
+  /** 11px - Small labels, secondary text */
+  SM: '11px',
+  /** 12px - Body text, buttons */
+  MD: '12px',
+  /** 13px - Default body text */
+  BASE: '13px',
+  /** 14px - Larger body text, form inputs */
+  LG: '14px',
+  /** 16px - Section headers */
+  XL: '16px',
+  /** 20px - Card titles, major headings */
+  XXL: '20px',
+} as const;
+
+/**
+ * Border radius scale for rounded corners.
+ *
+ * AI AGENT NOTE: Use SM for buttons, MD for inputs, LG for cards, XL for modals.
+ */
+export const BORDER_RADIUS = {
+  /** 4px - Small elements (buttons, tags) */
+  SM: '4px',
+  /** 6px - Inputs, small cards */
+  MD: '6px',
+  /** 8px - Cards, panels */
+  LG: '8px',
+  /** 12px - Modals, large cards */
+  XL: '12px',
+} as const;
+
+/**
+ * Common grid templates for admin layouts.
+ *
+ * AI AGENT NOTE: Use these for consistent column layouts.
+ */
+export const GRID_TEMPLATES = {
+  /** Service list: name | status | notes | actions */
+  SERVICES: 'minmax(120px, 1fr) 110px 1fr auto',
+} as const;
