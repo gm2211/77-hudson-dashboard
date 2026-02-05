@@ -4,9 +4,10 @@ import { api } from '../../utils/api';
 
 interface SnapshotHistoryProps {
   onRestore: () => void;
+  onItemRestore?: () => void; // Called for single-item restores (doesn't close modal)
 }
 
-export function SnapshotHistory({ onRestore }: SnapshotHistoryProps) {
+export function SnapshotHistory({ onRestore, onItemRestore }: SnapshotHistoryProps) {
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
   const [diff, setDiff] = useState<SnapshotDiff | null>(null);
@@ -74,6 +75,12 @@ export function SnapshotHistory({ onRestore }: SnapshotHistoryProps) {
     setLoading(false);
   };
 
+  const reloadDiff = async () => {
+    if (selectedVersion === null) return;
+    const data = await api.get<SnapshotDiff>(`/api/snapshots/${selectedVersion}/diff/draft`);
+    setDiff(data);
+  };
+
   const restoreFull = async (version: number) => {
     if (!confirm(`Restore entire snapshot v${version}? This will create a new version with that state.`)) return;
     await api.post(`/api/snapshots/restore/${version}`);
@@ -123,7 +130,10 @@ export function SnapshotHistory({ onRestore }: SnapshotHistoryProps) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {historicalSnapshots.map((s) => (
           <div key={s.version}>
-            <div style={styles.snapshotRow}>
+            <div
+              style={{ ...styles.snapshotRow, cursor: 'pointer' }}
+              onClick={() => loadDiff(s.version)}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <span style={{ fontWeight: 600, color: '#00bcd4' }}>v{s.version}</span>
                 <span style={{ color: '#888', fontSize: '13px' }}>
@@ -136,18 +146,12 @@ export function SnapshotHistory({ onRestore }: SnapshotHistoryProps) {
                   })}
                 </span>
               </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ display: 'flex', gap: '6px' }} onClick={e => e.stopPropagation()}>
                 <button
                   style={{ ...styles.smallBtn, ...styles.smallBtnPrimary }}
                   onClick={() => setPreviewVersion(s.version)}
                 >
                   Preview
-                </button>
-                <button
-                  style={{ ...styles.smallBtn, ...(selectedVersion === s.version ? styles.smallBtnInfo : {}) }}
-                  onClick={() => loadDiff(s.version)}
-                >
-                  {selectedVersion === s.version ? 'Hide Diff' : 'Diff'}
                 </button>
                 <button
                   style={{ ...styles.smallBtn, ...styles.smallBtnSuccess }}
@@ -174,6 +178,8 @@ export function SnapshotHistory({ onRestore }: SnapshotHistoryProps) {
                     diff={diff}
                     sourceVersion={s.version}
                     onRestore={onRestore}
+                    onItemRestore={onItemRestore}
+                    reloadDiff={reloadDiff}
                     onClose={() => {
                       setSelectedVersion(null);
                       setDiff(null);
@@ -259,10 +265,12 @@ interface SnapshotDiffViewProps {
   diff: SnapshotDiff;
   sourceVersion: number;
   onRestore: () => void;
+  onItemRestore?: () => void;
+  reloadDiff: () => Promise<void>;
   onClose: () => void;
 }
 
-function SnapshotDiffView({ diff, sourceVersion, onRestore, onClose }: SnapshotDiffViewProps) {
+function SnapshotDiffView({ diff, sourceVersion, onRestore, onItemRestore, reloadDiff, onClose }: SnapshotDiffViewProps) {
   const hasAnyDiff =
     diff.services.added.length > 0 ||
     diff.services.removed.length > 0 ||
@@ -288,7 +296,9 @@ function SnapshotDiffView({ diff, sourceVersion, onRestore, onClose }: SnapshotD
       sourceVersion,
       items: { [type]: [id] },
     });
-    onRestore();
+    // Reload diff to show updated state, then notify parent
+    await reloadDiff();
+    (onItemRestore || onRestore)();
   };
 
   const columnStyle: React.CSSProperties = { flex: 1, minWidth: 0 };

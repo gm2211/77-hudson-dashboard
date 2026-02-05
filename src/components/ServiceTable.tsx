@@ -33,6 +33,7 @@ export default function ServiceTable({ services, scrollSpeed = DEFAULTS.SERVICES
 
   const [currentPage, setCurrentPage] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [progress, setProgress] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Page transition effect
@@ -40,19 +41,30 @@ export default function ServiceTable({ services, scrollSpeed = DEFAULTS.SERVICES
     setIsAnimating(true);
     setTimeout(() => {
       setCurrentPage(page);
+      setProgress(0); // Reset progress only after page changes
       setTimeout(() => setIsAnimating(false), 50);
     }, 300);
   }, []);
 
-  // Auto-scroll timer
+  // Auto-scroll timer with progress tracking
   useEffect(() => {
     if (!needsScroll || scrollSpeed <= 0) return;
 
-    const interval = setInterval(() => {
-      const nextPage = (currentPage + 1) % totalPages;
-      goToPage(nextPage);
-    }, scrollSpeed * 1000);
+    const startTime = Date.now();
+    const duration = scrollSpeed * 1000;
 
+    const updateProgress = () => {
+      const elapsed = Date.now() - startTime;
+      const newProgress = Math.min(elapsed / duration, 1);
+      setProgress(newProgress);
+
+      if (newProgress >= 1) {
+        const nextPage = (currentPage + 1) % totalPages;
+        goToPage(nextPage);
+      }
+    };
+
+    const interval = setInterval(updateProgress, 50);
     return () => clearInterval(interval);
   }, [needsScroll, scrollSpeed, currentPage, totalPages, goToPage]);
 
@@ -68,24 +80,29 @@ export default function ServiceTable({ services, scrollSpeed = DEFAULTS.SERVICES
 
   return (
     <div style={styles.container}>
+      {/* Header table - always visible */}
+      <table style={{ ...styles.table, marginBottom: 0 }}>
+        <thead>
+          <tr>
+            <th style={styles.th}>Service</th>
+            <th style={styles.th}>Status</th>
+            {hasAnyNotes && <th style={styles.th}>Notes</th>}
+            <th style={{ ...styles.th, textAlign: 'right' }}>Last Checked</th>
+          </tr>
+        </thead>
+      </table>
+
+      {/* Body table - animated on page change */}
       <div
         ref={containerRef}
         style={{
           ...styles.tableWrapper,
-          maxHeight: needsScroll ? MAX_HEIGHT + 40 : undefined, // +40 for header
+          maxHeight: needsScroll ? MAX_HEIGHT : undefined,
           opacity: isAnimating ? 0 : 1,
           transition: 'opacity 0.3s ease-in-out',
         }}
       >
         <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Service</th>
-              <th style={styles.th}>Status</th>
-              {hasAnyNotes && <th style={styles.th}>Notes</th>}
-              <th style={{ ...styles.th, textAlign: 'right' }}>Last Checked</th>
-            </tr>
-          </thead>
           <tbody>
             {paddedServices.map((s, idx) => (
               s ? (
@@ -127,13 +144,33 @@ export default function ServiceTable({ services, scrollSpeed = DEFAULTS.SERVICES
           </span>
           <div style={styles.pageDots}>
             {Array.from({ length: totalPages }).map((_, i) => (
-              <span
+              <button
                 key={i}
+                onClick={() => goToPage(i)}
                 style={{
                   ...styles.pageDot,
                   background: i === currentPage ? '#00bcd4' : '#ccc',
+                  cursor: 'pointer',
+                  border: 'none',
+                  padding: 0,
+                  position: 'relative' as const,
+                  overflow: 'hidden',
                 }}
-              />
+                aria-label={`Go to page ${i + 1}`}
+              >
+                {/* Progress fill for current page */}
+                {i === currentPage && scrollSpeed > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    height: '100%',
+                    width: `${progress * 100}%`,
+                    background: 'rgba(255, 255, 255, 0.4)',
+                    transition: 'width 50ms linear',
+                  }} />
+                )}
+              </button>
             ))}
           </div>
         </div>
