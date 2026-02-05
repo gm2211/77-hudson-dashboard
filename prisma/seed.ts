@@ -18,7 +18,7 @@ async function main() {
       buildingNumber: '77',
       buildingName: 'Hudson',
       subtitle: 'Building Services Dashboard',
-      scrollSpeed: 50,
+      scrollSpeed: 30,
       tickerSpeed: 30,
       servicesScrollSpeed: 8,
     },
@@ -64,16 +64,16 @@ async function main() {
     }),
   ]);
 
-  // Create events using the 3 built-in images
+  // Create events using the 3 built-in images (details use bullet list format)
   const events = await Promise.all([
     prisma.event.create({
       data: {
         title: 'Morning Yoga',
         subtitle: 'Saturday, 9:00 AM',
         details: JSON.stringify([
-          'Start your weekend with a relaxing yoga session on the rooftop.',
-          'All levels welcome. Mats provided.',
-          '**RSVP at front desk**',
+          '- Start your weekend with a relaxing yoga session on the rooftop',
+          '- All levels welcome. Mats provided',
+          '- **RSVP at front desk**',
         ]),
         imageUrl: '/images/yoga.jpg',
         sortOrder: 0,
@@ -84,9 +84,9 @@ async function main() {
         title: 'Bagel Brunch',
         subtitle: 'Sunday, 10:00 AM',
         details: JSON.stringify([
-          'Join us in the community room for fresh bagels and coffee.',
-          'Assorted cream cheeses and toppings available.',
-          'Great way to meet your neighbors!',
+          '- Join us in the community room for fresh bagels and coffee',
+          '- Assorted cream cheeses and toppings available',
+          '- Great way to meet your neighbors!',
         ]),
         imageUrl: '/images/bagels.jpg',
         sortOrder: 1,
@@ -97,10 +97,10 @@ async function main() {
         title: 'Tequila Tasting Night',
         subtitle: 'Friday, 7:00 PM',
         details: JSON.stringify([
-          'Sample premium tequilas from Mexico.',
-          'Light appetizers included.',
-          '$20 per person - **21+ only**',
-          'Limited to 25 guests.',
+          '- Sample premium tequilas from Mexico',
+          '- Light appetizers included',
+          '- $20 per person - **21+ only**',
+          '- Limited to 25 guests',
         ]),
         imageUrl: '/images/tequila.jpg',
         sortOrder: 2,
@@ -111,9 +111,9 @@ async function main() {
         title: 'Building Maintenance Notice',
         subtitle: 'Scheduled Work',
         details: JSON.stringify([
-          'Fire alarm testing on **Monday 10am-2pm**.',
-          'Please disregard alarms during this time.',
-          'Contact management with questions.',
+          '- Fire alarm testing on **Monday 10am-2pm**',
+          '- Please disregard alarms during this time',
+          '- Contact management with questions',
         ]),
         imageUrl: '',
         sortOrder: 3,

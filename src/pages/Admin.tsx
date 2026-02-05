@@ -139,7 +139,7 @@ export default function Admin() {
               <strong style={{ color: '#e0e0e0' }}>Version History</strong>
               <button style={styles.smallBtn} onClick={() => setHistoryOpen(false)}>Close</button>
             </div>
-            <SnapshotHistory onRestore={() => { onSave(); setHistoryOpen(false); }} />
+            <SnapshotHistory onRestore={() => { onSave(); setHistoryOpen(false); }} onItemRestore={onSave} />
           </div>
         </div>
       )}
@@ -324,9 +324,8 @@ function ServicesSection({ services, config, onSave, hasChanged, publishedServic
       )}
       {services.length > 0 && (
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(120px, 1fr) 110px auto auto',
-          gap: '0',
+          display: 'flex',
+          flexDirection: 'column',
           fontSize: '13px',
           background: 'rgba(0, 0, 0, 0.15)',
           borderRadius: '8px',
@@ -334,10 +333,16 @@ function ServicesSection({ services, config, onSave, hasChanged, publishedServic
           overflow: 'hidden',
         }}>
           {/* Header row */}
-          <div style={{ padding: '8px 12px', background: 'rgba(0, 0, 0, 0.2)', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Service</div>
-          <div style={{ padding: '8px 12px', background: 'rgba(0, 0, 0, 0.2)', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</div>
-          <div style={{ padding: '8px 12px', background: 'rgba(0, 0, 0, 0.2)', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Notes</div>
-          <div style={{ padding: '8px 12px', background: 'rgba(0, 0, 0, 0.2)', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'right' }}></div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(120px, 1fr) 110px 1fr auto',
+            background: 'rgba(0, 0, 0, 0.2)',
+          }}>
+            <div style={{ padding: '8px 12px', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Service</div>
+            <div style={{ padding: '8px 12px', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</div>
+            <div style={{ padding: '8px 12px', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Notes</div>
+            <div style={{ padding: '8px 12px', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'right' }}></div>
+          </div>
 
           {services.map(s => {
             const pub = getPublishedService(s.id);
@@ -345,24 +350,31 @@ function ServicesSection({ services, config, onSave, hasChanged, publishedServic
             const isMarkedForDeletion = s.markedForDeletion;
             const statusChanged = pub && pub.status !== s.status;
             const notesChanged = pub && (s.notes || '') !== (pub.notes || '');
-            const hasItemChanges = !isMarkedForDeletion && !isNewDraft && (notesChanged);
+            const hasItemChanges = !isMarkedForDeletion && !isNewDraft && (statusChanged || notesChanged);
             const isExpanded = expandedNotes === s.id && !isMarkedForDeletion;
-            const rowStyle: React.CSSProperties = {
-              ...(isMarkedForDeletion ? { background: 'rgba(244, 67, 54, 0.1)' } : {}),
-              ...(hasItemChanges ? { background: 'rgba(255, 193, 7, 0.08)' } : {}),
-            };
 
             return (
-              <div key={s.id} style={{ display: 'contents' }}>
+              <div
+                key={s.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(120px, 1fr) 110px 1fr auto',
+                  borderTop: isMarkedForDeletion
+                    ? '1px solid rgba(244, 67, 54, 0.3)'
+                    : hasItemChanges
+                      ? '1px solid rgba(255, 193, 7, 0.5)'
+                      : '1px solid rgba(255, 255, 255, 0.03)',
+                  ...(isMarkedForDeletion ? styles.markedForDeletion : {}),
+                  ...(hasItemChanges ? styles.itemChanged : {}),
+                }}
+              >
                 {/* Service name */}
                 <div style={{
                   padding: '8px 12px',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.03)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
                   ...(isMarkedForDeletion ? { textDecoration: 'line-through', opacity: 0.5 } : {}),
-                  ...rowStyle,
                 }}>
                   {isNewDraft && !isMarkedForDeletion && <span style={styles.draftIndicator} title="New draft item">●</span>}
                   {isMarkedForDeletion && <span style={{ color: '#f44336', fontSize: '10px' }} title="Will be deleted on publish">🗑</span>}
@@ -372,20 +384,19 @@ function ServicesSection({ services, config, onSave, hasChanged, publishedServic
                 {/* Status */}
                 <div style={{
                   padding: '6px 8px',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.03)',
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  ...rowStyle,
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  gap: '2px',
                 }}>
                   {isMarkedForDeletion ? (
                     <span style={{ color: STATUS_COLORS[s.status], opacity: 0.5 }}>{s.status}</span>
                   ) : (
                     <>
+                      <StatusSelect value={s.status} onChange={v => changeStatus(s, v)} style={{ padding: '2px 4px', fontSize: '11px' }} />
                       {statusChanged && (
-                        <span style={{ fontSize: '9px', opacity: 0.7, color: STATUS_COLORS[pub.status] }}>{pub.status}→</span>
+                        <span style={{ fontSize: '9px', color: '#888' }}>was: <span style={{ color: STATUS_COLORS[pub.status] }}>{pub.status}</span></span>
                       )}
-                      <StatusSelect value={s.status} onChange={v => changeStatus(s, v)} style={{ padding: '2px 4px', fontSize: '11px', flex: 1 }} />
                     </>
                   )}
                 </div>
@@ -393,11 +404,9 @@ function ServicesSection({ services, config, onSave, hasChanged, publishedServic
                 {/* Notes */}
                 <div style={{
                   padding: '6px 8px',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.03)',
                   display: 'flex',
                   alignItems: 'center',
                   minWidth: 0,
-                  ...rowStyle,
                 }}>
                   {isMarkedForDeletion ? (
                     <span style={{ fontSize: '11px', color: '#666', opacity: 0.5 }}>{s.notes || '—'}</span>
@@ -454,12 +463,10 @@ function ServicesSection({ services, config, onSave, hasChanged, publishedServic
                 {/* Actions */}
                 <div style={{
                   padding: '6px 8px',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.03)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'flex-end',
                   gap: '4px',
-                  ...rowStyle,
                 }}>
                   {isMarkedForDeletion ? (
                     <button style={{ ...styles.smallBtn, ...styles.smallBtnSuccess, padding: '2px 8px', fontSize: '10px', marginLeft: 0 }} onClick={() => unmarkForDeletion(s.id)}>Undo</button>
@@ -560,6 +567,7 @@ type CardPreviewData = {
 
 function EventCardPreview({ title, subtitle, imageUrl, details }: CardPreviewData & { details: string }) {
   // Match actual EventCard component styling
+  // On the dashboard, cards take full container width (~400-500px typically)
   const cardStyle: React.CSSProperties = {
     background: imageUrl
       ? EVENT_CARD_GRADIENT.withImage(imageUrl)
@@ -572,7 +580,8 @@ function EventCardPreview({ title, subtitle, imageUrl, details }: CardPreviewDat
     border: '1px solid rgba(255,255,255,0.1)',
     display: 'flex',
     flexDirection: 'column',
-    maxWidth: '480px',
+    width: '450px', // Match typical dashboard card width
+    minWidth: '450px',
   };
 
   const renderedMarkdown = parseMarkdown(details);
@@ -604,7 +613,30 @@ function EventCardPreview({ title, subtitle, imageUrl, details }: CardPreviewDat
 
 function MarkdownEditor({ value, onChange, placeholder, cardPreview }: { value: string; onChange: (v: string) => void; placeholder?: string; cardPreview?: CardPreviewData }) {
   const [showPreview, setShowPreview] = useState(false);
+  const [cursorPos, setCursorPos] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Detect current line format based on cursor position
+  const getCurrentLineFormat = () => {
+    let lineStart = cursorPos;
+    while (lineStart > 0 && value[lineStart - 1] !== '\n') {
+      lineStart--;
+    }
+    const lineEnd = value.indexOf('\n', cursorPos);
+    const currentLine = value.substring(lineStart, lineEnd === -1 ? value.length : lineEnd);
+
+    if (/^\s*[-*]\s/.test(currentLine)) return 'bullet';
+    if (/^\s*\d+\.\s/.test(currentLine)) return 'numbered';
+    return null;
+  };
+
+  const lineFormat = getCurrentLineFormat();
+
+  const updateCursorPos = () => {
+    if (textareaRef.current) {
+      setCursorPos(textareaRef.current.selectionStart);
+    }
+  };
 
   const insertMarkdown = (prefix: string, suffix: string = prefix) => {
     const textarea = textareaRef.current;
@@ -631,6 +663,55 @@ function MarkdownEditor({ value, onChange, placeholder, cardPreview }: { value: 
     if (!textarea) return;
 
     const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = value;
+
+    // Find the start of the first selected line
+    let lineStart = start;
+    while (lineStart > 0 && text[lineStart - 1] !== '\n') {
+      lineStart--;
+    }
+
+    // Find the end of the last selected line
+    let lineEnd = end;
+    while (lineEnd < text.length && text[lineEnd] !== '\n') {
+      lineEnd++;
+    }
+
+    // Get all selected lines
+    const selectedText = text.substring(lineStart, lineEnd);
+    const lines = selectedText.split('\n');
+
+    // Apply prefix to each line
+    const prefixedLines = lines.map((line, i) => {
+      // For numbered lists, increment the number for each line
+      if (prefix === '1. ') {
+        return `${i + 1}. ${line}`;
+      }
+      return prefix + line;
+    });
+
+    const newText = text.substring(0, lineStart) + prefixedLines.join('\n') + text.substring(lineEnd);
+    onChange(newText);
+
+    // Calculate new selection: select all the prefixed lines
+    const newSelectionStart = lineStart;
+    const newSelectionEnd = lineStart + prefixedLines.join('\n').length;
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(newSelectionStart, newSelectionEnd);
+    }, 0);
+  };
+
+  // Handle Enter key to continue bullet/numbered lists
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== 'Enter') return;
+
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
     const text = value;
 
     // Find the start of the current line
@@ -639,13 +720,57 @@ function MarkdownEditor({ value, onChange, placeholder, cardPreview }: { value: 
       lineStart--;
     }
 
-    const newText = text.substring(0, lineStart) + prefix + text.substring(lineStart);
-    onChange(newText);
+    const currentLine = text.substring(lineStart, start);
 
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + prefix.length, start + prefix.length);
-    }, 0);
+    // Check for bullet list (- or *)
+    const bulletMatch = currentLine.match(/^(\s*)([-*])\s/);
+    if (bulletMatch) {
+      // If line is empty bullet, remove it instead of continuing
+      if (currentLine.trim() === bulletMatch[2]) {
+        e.preventDefault();
+        const newText = text.substring(0, lineStart) + text.substring(start);
+        onChange(newText);
+        setTimeout(() => {
+          textarea.focus();
+          textarea.setSelectionRange(lineStart, lineStart);
+        }, 0);
+        return;
+      }
+      e.preventDefault();
+      const prefix = `\n${bulletMatch[1]}${bulletMatch[2]} `;
+      const newText = text.substring(0, start) + prefix + text.substring(start);
+      onChange(newText);
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + prefix.length, start + prefix.length);
+      }, 0);
+      return;
+    }
+
+    // Check for numbered list (1. 2. etc)
+    const numberedMatch = currentLine.match(/^(\s*)(\d+)\.\s/);
+    if (numberedMatch) {
+      // If line is empty number, remove it instead of continuing
+      if (currentLine.trim() === `${numberedMatch[2]}.`) {
+        e.preventDefault();
+        const newText = text.substring(0, lineStart) + text.substring(start);
+        onChange(newText);
+        setTimeout(() => {
+          textarea.focus();
+          textarea.setSelectionRange(lineStart, lineStart);
+        }, 0);
+        return;
+      }
+      e.preventDefault();
+      const nextNum = parseInt(numberedMatch[2], 10) + 1;
+      const prefix = `\n${numberedMatch[1]}${nextNum}. `;
+      const newText = text.substring(0, start) + prefix + text.substring(start);
+      onChange(newText);
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + prefix.length, start + prefix.length);
+      }, 0);
+    }
   };
 
   const toolbarBtnStyle: React.CSSProperties = {
@@ -657,6 +782,12 @@ function MarkdownEditor({ value, onChange, placeholder, cardPreview }: { value: 
     cursor: 'pointer',
     fontSize: '12px',
     minWidth: '28px',
+  };
+
+  const toolbarBtnActiveStyle: React.CSSProperties = {
+    ...toolbarBtnStyle,
+    background: '#00838f',
+    borderColor: '#00bcd4',
   };
 
   return (
@@ -676,8 +807,8 @@ function MarkdownEditor({ value, onChange, placeholder, cardPreview }: { value: 
           <button type="button" style={{ ...toolbarBtnStyle, fontWeight: 'bold' }} onClick={() => insertMarkdown('**')} title="Bold">B</button>
           <button type="button" style={{ ...toolbarBtnStyle, fontStyle: 'italic' }} onClick={() => insertMarkdown('*')} title="Italic">I</button>
           <button type="button" style={{ ...toolbarBtnStyle, textDecoration: 'line-through' }} onClick={() => insertMarkdown('~~')} title="Strikethrough">S</button>
-          <button type="button" style={toolbarBtnStyle} onClick={() => insertLinePrefix('- ')} title="Bullet list">•</button>
-          <button type="button" style={toolbarBtnStyle} onClick={() => insertLinePrefix('1. ')} title="Numbered list">1.</button>
+          <button type="button" style={lineFormat === 'bullet' ? toolbarBtnActiveStyle : toolbarBtnStyle} onClick={() => insertLinePrefix('- ')} title="Bullet list">•</button>
+          <button type="button" style={lineFormat === 'numbered' ? toolbarBtnActiveStyle : toolbarBtnStyle} onClick={() => insertLinePrefix('1. ')} title="Numbered list">1.</button>
         </div>
       )}
       {showPreview ? (
@@ -695,7 +826,11 @@ function MarkdownEditor({ value, onChange, placeholder, cardPreview }: { value: 
           style={{ ...styles.input, height: '100px', fontFamily: 'monospace', fontSize: '13px' }}
           placeholder={placeholder || "**Bold**, *italic*, ~~strikethrough~~, `code`\n- Bullet list\n1. Numbered list"}
           value={value}
-          onChange={e => onChange(e.target.value)}
+          onChange={e => { onChange(e.target.value); updateCursorPos(); }}
+          onKeyDown={handleKeyDown}
+          onKeyUp={updateCursorPos}
+          onClick={updateCursorPos}
+          onSelect={updateCursorPos}
         />
       )}
     </div>
@@ -703,7 +838,7 @@ function MarkdownEditor({ value, onChange, placeholder, cardPreview }: { value: 
 }
 
 function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: { events: Event[]; config: BuildingConfig | null; onSave: () => void; hasChanged: boolean; publishedEvents: Event[] | null }) {
-  const empty = { title: '', subtitle: '', details: '' as string, imageUrl: '' };
+  const empty = { title: '', subtitle: '', details: '- ', imageUrl: '' }; // Start with bullet list
   const [form, setForm] = useState(empty);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formExpanded, setFormExpanded] = useState(false);
@@ -863,7 +998,11 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
             JSON.stringify(pub.details) !== JSON.stringify(e.details)
           );
           return (
-            <div key={e.id} style={{ ...styles.listCard, ...(isMarkedForDeletion ? styles.markedForDeletion : {}), ...(hasChanges ? styles.itemChanged : {}) }}>
+            <div key={e.id} style={{
+              ...styles.listCard,
+              ...(isMarkedForDeletion ? { ...styles.markedForDeletion, border: '1px solid rgba(244, 67, 54, 0.3)' } : {}),
+              ...(hasChanges ? styles.itemChanged : {}),
+            }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, ...(isMarkedForDeletion ? { textDecoration: 'line-through', opacity: 0.5 } : {}) }}>
                 {isNewDraft && !isMarkedForDeletion && <span style={styles.draftIndicator} title="New draft item">●</span>}
                 {isMarkedForDeletion && <span style={{ color: '#f44336', fontSize: '10px' }} title="Will be deleted on publish">🗑</span>}
@@ -1087,7 +1226,15 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAd
           const hasChanges = !isMarkedForDeletion && !isNewDraft && (labelChanged || messageChanged);
 
           return (
-            <div key={a.id} style={{ ...styles.listCard, flexDirection: 'column', gap: '8px', opacity: isMarkedForDeletion ? 1 : (a.active ? 1 : 0.5), ...(isMarkedForDeletion ? styles.markedForDeletion : {}), ...(isBeingEdited ? { borderColor: '#00838f', borderWidth: '2px' } : {}), ...(!isBeingEdited && hasChanges ? styles.itemChanged : {}) }}>
+            <div key={a.id} style={{
+              ...styles.listCard,
+              flexDirection: 'column',
+              gap: '8px',
+              opacity: isMarkedForDeletion ? 1 : (a.active ? 1 : 0.5),
+              ...(isMarkedForDeletion ? { ...styles.markedForDeletion, border: '1px solid rgba(244, 67, 54, 0.3)' } : {}),
+              ...(isBeingEdited ? { border: '2px solid #00838f' } : {}),
+              ...(!isBeingEdited && hasChanges ? styles.itemChanged : {}),
+            }}>
               <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '8px' }}>
                 {isNewDraft && !isMarkedForDeletion && <span style={styles.draftIndicator} title="New draft item">●</span>}
                 {isMarkedForDeletion && <span style={{ color: '#f44336', fontSize: '10px' }} title="Will be deleted on publish">🗑</span>}
@@ -1104,7 +1251,20 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAd
                       {activeChanged && (
                         <span style={{ fontSize: '10px', color: '#ffc107', opacity: 0.8 }}>{pub.active ? 'ON' : 'OFF'} →</span>
                       )}
-                      <button style={{ ...styles.smallBtn, ...(a.active ? styles.smallBtnSuccess : {}) }} onClick={() => toggleActive(a)}>{a.active ? 'ON' : 'OFF'}</button>
+                      <button
+                        style={{
+                          ...styles.toggle,
+                          background: a.active ? 'rgba(76, 175, 80, 0.35)' : 'rgba(255, 255, 255, 0.08)',
+                          borderColor: a.active ? 'rgba(76, 175, 80, 0.5)' : 'rgba(255, 255, 255, 0.15)',
+                        }}
+                        onClick={() => toggleActive(a)}
+                        title={a.active ? 'Active - click to disable' : 'Inactive - click to enable'}
+                      >
+                        <span style={{
+                          ...styles.toggleKnob,
+                          transform: a.active ? 'translateX(16px)' : 'translateX(0)',
+                        }} />
+                      </button>
                       <button style={{ ...styles.smallBtn, ...(isBeingEdited ? styles.smallBtnInfo : styles.smallBtnPrimary) }} onClick={() => isBeingEdited ? cancelEdit() : startEdit(a)}>✎</button>
                       <button style={{ ...styles.smallBtn, ...styles.smallBtnDanger }} onClick={() => markForDeletion(a.id)}>✕</button>
                     </>
@@ -1183,7 +1343,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
   itemChanged: {
     boxShadow: 'inset 0 0 0 1px rgba(255, 193, 7, 0.5), 0 0 8px rgba(255, 193, 7, 0.2)',
-    borderColor: 'rgba(255, 193, 7, 0.5)',
   },
   listHeader: {
     display: 'flex',
@@ -1215,7 +1374,27 @@ const styles: Record<string, React.CSSProperties> = {
   },
   markedForDeletion: {
     background: 'rgba(244, 67, 54, 0.1)',
-    border: '1px solid rgba(244, 67, 54, 0.3)',
+  },
+  toggle: {
+    width: '36px',
+    height: '20px',
+    borderRadius: '4px',
+    border: '1px solid rgba(255, 255, 255, 0.15)',
+    cursor: 'pointer',
+    position: 'relative' as const,
+    padding: 0,
+    transition: 'background 0.2s, border-color 0.2s',
+  },
+  toggleKnob: {
+    position: 'absolute' as const,
+    top: '2px',
+    left: '2px',
+    width: '14px',
+    height: '14px',
+    borderRadius: '3px',
+    background: 'rgba(255, 255, 255, 0.9)',
+    transition: 'transform 0.2s',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
   },
   btn: { background: '#00838f', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 16px', cursor: 'pointer', fontWeight: 600 },
   headerBtn: {

@@ -30,6 +30,7 @@ async function getCurrentState() {
         notes: s.notes,
         lastChecked: s.lastChecked.toISOString(),
         sortOrder: s.sortOrder,
+        markedForDeletion: s.markedForDeletion,
       })),
       scrollSpeed: config?.servicesScrollSpeed ?? 8,
     },
@@ -43,6 +44,7 @@ async function getCurrentState() {
         imageUrl: e.imageUrl,
         accentColor: e.accentColor,
         sortOrder: e.sortOrder,
+        markedForDeletion: e.markedForDeletion,
       })),
       scrollSpeed: config?.scrollSpeed ?? 30,
     },
@@ -53,6 +55,7 @@ async function getCurrentState() {
         label: a.label,
         message: a.message,
         active: a.active,
+        markedForDeletion: a.markedForDeletion,
       })),
       tickerSpeed: config?.tickerSpeed ?? 25,
     },
@@ -120,6 +123,8 @@ router.get('/draft-status', async (_req, res) => {
       .filter((item: any) => !item.markedForDeletion)
       .map((item: any) => {
         const normalized = { ...item };
+        // Always exclude markedForDeletion from comparison (it's operational, not content)
+        delete normalized.markedForDeletion;
         excludeFields.forEach(f => delete normalized[f]);
         return normalized;
       })

@@ -81,11 +81,34 @@ export default function Dashboard() {
  */
 function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [needsScroll, setNeedsScroll] = useState(false);
 
   const shouldScroll = events.length > 0 && scrollSpeed > 0;
+  // Only duplicate content when we actually need to scroll (content overflows)
+  const displayEvents = (shouldScroll && needsScroll) ? [...events, ...events] : events;
 
+  // Check if content overflows and we need scrolling
   useEffect(() => {
-    if (!shouldScroll) return;
+    const container = containerRef.current;
+    if (!container || !shouldScroll) {
+      setNeedsScroll(false);
+      return;
+    }
+    // Check after render if content overflows
+    const checkOverflow = () => {
+      const overflows = container.scrollHeight > container.clientHeight;
+      setNeedsScroll(overflows);
+    };
+    checkOverflow();
+    // Recheck on resize
+    const observer = new ResizeObserver(checkOverflow);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [shouldScroll, events.length]);
+
+  // Run the scroll animation
+  useEffect(() => {
+    if (!shouldScroll || !needsScroll) return;
     const container = containerRef.current;
     if (!container) return;
 
@@ -120,10 +143,7 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
 
     animId = requestAnimationFrame(step);
     return () => cancelAnimationFrame(animId);
-  }, [shouldScroll, scrollSpeed, events.length]);
-
-  // Always duplicate cards for seamless loop when scrolling
-  const displayEvents = shouldScroll ? [...events, ...events] : events;
+  }, [shouldScroll, needsScroll, scrollSpeed, events.length]);
 
   return (
     <div style={styles.cardsWrapper}>
