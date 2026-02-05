@@ -1,5 +1,6 @@
 import type { Event } from '../types';
 import { parseMarkdown } from '../utils/markdown';
+import { EVENT_CARD_GRADIENT } from '../constants';
 
 export default function EventCard({ event }: { event: Event }) {
   const detailsMarkdown = event.details.join('\n');
@@ -9,8 +10,8 @@ export default function EventCard({ event }: { event: Event }) {
     <div style={{
       ...styles.card,
       background: event.imageUrl
-        ? `linear-gradient(to right, rgba(20,60,58,0.92) 0%, rgba(20,60,58,0.75) 50%, rgba(20,60,58,0.3) 100%), url(${event.imageUrl})`
-        : 'linear-gradient(135deg, #1a5c5a 0%, #1a4a48 100%)',
+        ? EVENT_CARD_GRADIENT.withImage(event.imageUrl)
+        : EVENT_CARD_GRADIENT.noImage,
       backgroundSize: event.imageUrl ? '100% 100%, cover' : undefined,
       backgroundPosition: event.imageUrl ? 'center, center' : undefined,
       backgroundRepeat: 'no-repeat',

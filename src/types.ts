@@ -34,6 +34,7 @@ export interface BuildingConfig {
   subtitle: string;
   scrollSpeed: number;
   tickerSpeed: number;
+  servicesScrollSpeed: number;
 }
 
 export interface Snapshot {

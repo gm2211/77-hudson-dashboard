@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '../components/Header';
 import ServiceTable from '../components/ServiceTable';
 import EventCard from '../components/EventCard';
 import AdvisoryTicker from '../components/AdvisoryTicker';
+import { DEFAULTS } from '../constants';
 import type { Service, Event, Advisory, BuildingConfig } from '../types';
 
 export default function Dashboard() {
@@ -47,75 +48,70 @@ export default function Dashboard() {
     return () => es.close();
   }, [fetchAll]);
 
-  const scrollSpeed = config?.scrollSpeed ?? 30;
-  const tickerSpeed = config?.tickerSpeed ?? 25;
+  const scrollSpeed = config?.scrollSpeed ?? DEFAULTS.SCROLL_SPEED;
+  const tickerSpeed = config?.tickerSpeed ?? DEFAULTS.TICKER_SPEED;
+  const servicesScrollSpeed = config?.servicesScrollSpeed ?? DEFAULTS.SERVICES_SCROLL_SPEED;
 
   return (
     <div style={styles.page}>
       <Header config={config} />
       <div style={styles.body}>
-        <ServiceTable services={services} />
+        <ServiceTable services={services} scrollSpeed={servicesScrollSpeed} />
         <AutoScrollCards events={events} scrollSpeed={scrollSpeed} />
       </div>
       <AdvisoryTicker advisories={advisories} tickerSpeed={tickerSpeed} />
       <style>{`
         html, body { overflow: hidden; height: 100%; background: #fff; }
         #root { height: 100%; }
+        *::-webkit-scrollbar { display: none; }
       `}</style>
     </div>
   );
 }
 
+/**
+ * Auto-scrolling event cards with seamless loop.
+ *
+ * IMPORTANT SCROLLING NOTES (don't break this again!):
+ * 1. Container needs position:absolute with inset:0 inside a position:relative wrapper
+ *    to get a definite height for overflow:auto to work in flexbox
+ * 2. Must accumulate fractional pixels and only call scrollBy() when >= 1px,
+ *    because browsers ignore sub-pixel scrollTop assignments
+ * 3. Use scrollBy({ top, behavior: 'instant' }) not direct scrollTop assignment
+ */
 function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const innerRef = useRef<HTMLDivElement>(null);
-  const [needsScroll, setNeedsScroll] = useState(false);
-  const isDoubledRef = useRef(false);
+
+  const shouldScroll = events.length > 0 && scrollSpeed > 0;
 
   useEffect(() => {
-    const container = containerRef.current;
-    const inner = innerRef.current;
-    if (!container || !inner) return;
-
-    const check = () => {
-      // When currently doubled, estimate single-content height as half
-      const measuredHeight = inner.scrollHeight;
-      const singleHeight = isDoubledRef.current ? measuredHeight / 2 : measuredHeight;
-      const needs = singleHeight > container.clientHeight;
-      setNeedsScroll(needs);
-    };
-    check();
-    const obs = new ResizeObserver(check);
-    obs.observe(container);
-    obs.observe(inner);
-    return () => obs.disconnect();
-  }, [events]);
-
-  // Use layout effect to reset scroll before paint (prevents visual flash)
-  useLayoutEffect(() => {
-    if (!needsScroll && containerRef.current) {
-      containerRef.current.scrollTop = 0;
-    }
-    isDoubledRef.current = needsScroll;
-  }, [needsScroll]);
-
-  useEffect(() => {
-    if (!needsScroll || scrollSpeed === 0) return;
+    if (!shouldScroll) return;
     const container = containerRef.current;
     if (!container) return;
 
     let animId: number;
     let lastTime: number | null = null;
-    const pxPerMs = scrollSpeed / 1000;
+    let accumulatedScroll = 0;
 
     const step = (time: number) => {
       if (lastTime !== null) {
         const dt = time - lastTime;
-        container.scrollTop += pxPerMs * dt;
+        const contentHeight = container.scrollHeight / 2;
+        const maxScrollTop = container.scrollHeight - container.clientHeight;
 
-        const halfScroll = container.scrollHeight / 2;
-        if (container.scrollTop >= halfScroll) {
-          container.scrollTop -= halfScroll;
+        if (maxScrollTop > 0) {
+          const pxPerMs = contentHeight / (scrollSpeed * 1000);
+          accumulatedScroll += pxPerMs * dt;
+
+          if (accumulatedScroll >= 1) {
+            const scrollAmount = Math.floor(accumulatedScroll);
+            container.scrollBy({ top: scrollAmount, behavior: 'instant' });
+            accumulatedScroll -= scrollAmount;
+          }
+
+          if (container.scrollTop >= contentHeight) {
+            container.scrollTop -= contentHeight;
+          }
         }
       }
       lastTime = time;
@@ -124,15 +120,17 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
 
     animId = requestAnimationFrame(step);
     return () => cancelAnimationFrame(animId);
-  }, [needsScroll, scrollSpeed]);
+  }, [shouldScroll, scrollSpeed, events.length]);
 
-  // When scrolling, duplicate cards for seamless loop
-  const displayEvents = needsScroll ? [...events, ...events] : events;
+  // Always duplicate cards for seamless loop when scrolling
+  const displayEvents = shouldScroll ? [...events, ...events] : events;
 
   return (
-    <div ref={containerRef} style={styles.cards}>
-      <div ref={innerRef} style={styles.cardsInner}>
-        {displayEvents.map((e, i) => <EventCard key={`${e.id}-${i}`} event={e} />)}
+    <div style={styles.cardsWrapper}>
+      <div ref={containerRef} style={styles.cards}>
+        <div style={styles.cardsInner}>
+          {displayEvents.map((e, i) => <EventCard key={`${e.id}-${i}`} event={e} />)}
+        </div>
       </div>
     </div>
   );
@@ -147,15 +145,25 @@ const styles: Record<string, React.CSSProperties> = {
   },
   body: {
     flex: 1,
+    minHeight: 0, // Required for nested flex containers to shrink properly
     padding: '20px 40px',
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
     overflow: 'hidden',
   },
-  cards: {
+  cardsWrapper: {
     flex: 1,
-    overflow: 'hidden',
+    minHeight: 0,
+    position: 'relative',
+  },
+  cards: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'auto',
   },
   cardsInner: {
     display: 'flex',
