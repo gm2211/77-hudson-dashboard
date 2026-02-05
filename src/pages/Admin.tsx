@@ -324,9 +324,8 @@ function ServicesSection({ services, config, onSave, hasChanged, publishedServic
       )}
       {services.length > 0 && (
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(120px, 1fr) 110px auto auto',
-          gap: '0',
+          display: 'flex',
+          flexDirection: 'column',
           fontSize: '13px',
           background: 'rgba(0, 0, 0, 0.15)',
           borderRadius: '8px',
@@ -334,10 +333,16 @@ function ServicesSection({ services, config, onSave, hasChanged, publishedServic
           overflow: 'hidden',
         }}>
           {/* Header row */}
-          <div style={{ padding: '8px 12px', background: 'rgba(0, 0, 0, 0.2)', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Service</div>
-          <div style={{ padding: '8px 12px', background: 'rgba(0, 0, 0, 0.2)', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</div>
-          <div style={{ padding: '8px 12px', background: 'rgba(0, 0, 0, 0.2)', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Notes</div>
-          <div style={{ padding: '8px 12px', background: 'rgba(0, 0, 0, 0.2)', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'right' }}></div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(120px, 1fr) 110px 1fr auto',
+            background: 'rgba(0, 0, 0, 0.2)',
+          }}>
+            <div style={{ padding: '8px 12px', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Service</div>
+            <div style={{ padding: '8px 12px', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</div>
+            <div style={{ padding: '8px 12px', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Notes</div>
+            <div style={{ padding: '8px 12px', fontWeight: 600, fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'right' }}></div>
+          </div>
 
           {services.map(s => {
             const pub = getPublishedService(s.id);
@@ -345,24 +350,31 @@ function ServicesSection({ services, config, onSave, hasChanged, publishedServic
             const isMarkedForDeletion = s.markedForDeletion;
             const statusChanged = pub && pub.status !== s.status;
             const notesChanged = pub && (s.notes || '') !== (pub.notes || '');
-            const hasItemChanges = !isMarkedForDeletion && !isNewDraft && (notesChanged);
+            const hasItemChanges = !isMarkedForDeletion && !isNewDraft && (statusChanged || notesChanged);
             const isExpanded = expandedNotes === s.id && !isMarkedForDeletion;
-            const rowStyle: React.CSSProperties = {
-              ...(isMarkedForDeletion ? { background: 'rgba(244, 67, 54, 0.1)' } : {}),
-              ...(hasItemChanges ? { background: 'rgba(255, 193, 7, 0.08)' } : {}),
-            };
 
             return (
-              <div key={s.id} style={{ display: 'contents' }}>
+              <div
+                key={s.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(120px, 1fr) 110px 1fr auto',
+                  borderTop: isMarkedForDeletion
+                    ? '1px solid rgba(244, 67, 54, 0.3)'
+                    : hasItemChanges
+                      ? '1px solid rgba(255, 193, 7, 0.5)'
+                      : '1px solid rgba(255, 255, 255, 0.03)',
+                  ...(isMarkedForDeletion ? styles.markedForDeletion : {}),
+                  ...(hasItemChanges ? styles.itemChanged : {}),
+                }}
+              >
                 {/* Service name */}
                 <div style={{
                   padding: '8px 12px',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.03)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
                   ...(isMarkedForDeletion ? { textDecoration: 'line-through', opacity: 0.5 } : {}),
-                  ...rowStyle,
                 }}>
                   {isNewDraft && !isMarkedForDeletion && <span style={styles.draftIndicator} title="New draft item">●</span>}
                   {isMarkedForDeletion && <span style={{ color: '#f44336', fontSize: '10px' }} title="Will be deleted on publish">🗑</span>}
@@ -372,20 +384,19 @@ function ServicesSection({ services, config, onSave, hasChanged, publishedServic
                 {/* Status */}
                 <div style={{
                   padding: '6px 8px',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.03)',
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  ...rowStyle,
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  gap: '2px',
                 }}>
                   {isMarkedForDeletion ? (
                     <span style={{ color: STATUS_COLORS[s.status], opacity: 0.5 }}>{s.status}</span>
                   ) : (
                     <>
+                      <StatusSelect value={s.status} onChange={v => changeStatus(s, v)} style={{ padding: '2px 4px', fontSize: '11px' }} />
                       {statusChanged && (
-                        <span style={{ fontSize: '9px', opacity: 0.7, color: STATUS_COLORS[pub.status] }}>{pub.status}→</span>
+                        <span style={{ fontSize: '9px', color: '#888' }}>was: <span style={{ color: STATUS_COLORS[pub.status] }}>{pub.status}</span></span>
                       )}
-                      <StatusSelect value={s.status} onChange={v => changeStatus(s, v)} style={{ padding: '2px 4px', fontSize: '11px', flex: 1 }} />
                     </>
                   )}
                 </div>
@@ -393,11 +404,9 @@ function ServicesSection({ services, config, onSave, hasChanged, publishedServic
                 {/* Notes */}
                 <div style={{
                   padding: '6px 8px',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.03)',
                   display: 'flex',
                   alignItems: 'center',
                   minWidth: 0,
-                  ...rowStyle,
                 }}>
                   {isMarkedForDeletion ? (
                     <span style={{ fontSize: '11px', color: '#666', opacity: 0.5 }}>{s.notes || '—'}</span>
@@ -454,12 +463,10 @@ function ServicesSection({ services, config, onSave, hasChanged, publishedServic
                 {/* Actions */}
                 <div style={{
                   padding: '6px 8px',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.03)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'flex-end',
                   gap: '4px',
-                  ...rowStyle,
                 }}>
                   {isMarkedForDeletion ? (
                     <button style={{ ...styles.smallBtn, ...styles.smallBtnSuccess, padding: '2px 8px', fontSize: '10px', marginLeft: 0 }} onClick={() => unmarkForDeletion(s.id)}>Undo</button>
@@ -656,20 +663,44 @@ function MarkdownEditor({ value, onChange, placeholder, cardPreview }: { value: 
     if (!textarea) return;
 
     const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
     const text = value;
 
-    // Find the start of the current line
+    // Find the start of the first selected line
     let lineStart = start;
     while (lineStart > 0 && text[lineStart - 1] !== '\n') {
       lineStart--;
     }
 
-    const newText = text.substring(0, lineStart) + prefix + text.substring(lineStart);
+    // Find the end of the last selected line
+    let lineEnd = end;
+    while (lineEnd < text.length && text[lineEnd] !== '\n') {
+      lineEnd++;
+    }
+
+    // Get all selected lines
+    const selectedText = text.substring(lineStart, lineEnd);
+    const lines = selectedText.split('\n');
+
+    // Apply prefix to each line
+    const prefixedLines = lines.map((line, i) => {
+      // For numbered lists, increment the number for each line
+      if (prefix === '1. ') {
+        return `${i + 1}. ${line}`;
+      }
+      return prefix + line;
+    });
+
+    const newText = text.substring(0, lineStart) + prefixedLines.join('\n') + text.substring(lineEnd);
     onChange(newText);
+
+    // Calculate new selection: select all the prefixed lines
+    const newSelectionStart = lineStart;
+    const newSelectionEnd = lineStart + prefixedLines.join('\n').length;
 
     setTimeout(() => {
       textarea.focus();
-      textarea.setSelectionRange(start + prefix.length, start + prefix.length);
+      textarea.setSelectionRange(newSelectionStart, newSelectionEnd);
     }, 0);
   };
 
@@ -967,7 +998,11 @@ function EventsSection({ events, config, onSave, hasChanged, publishedEvents }: 
             JSON.stringify(pub.details) !== JSON.stringify(e.details)
           );
           return (
-            <div key={e.id} style={{ ...styles.listCard, ...(isMarkedForDeletion ? styles.markedForDeletion : {}), ...(hasChanges ? styles.itemChanged : {}) }}>
+            <div key={e.id} style={{
+              ...styles.listCard,
+              ...(isMarkedForDeletion ? { ...styles.markedForDeletion, border: '1px solid rgba(244, 67, 54, 0.3)' } : {}),
+              ...(hasChanges ? styles.itemChanged : {}),
+            }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, ...(isMarkedForDeletion ? { textDecoration: 'line-through', opacity: 0.5 } : {}) }}>
                 {isNewDraft && !isMarkedForDeletion && <span style={styles.draftIndicator} title="New draft item">●</span>}
                 {isMarkedForDeletion && <span style={{ color: '#f44336', fontSize: '10px' }} title="Will be deleted on publish">🗑</span>}
@@ -1191,7 +1226,15 @@ function AdvisoriesSection({ advisories, config, onSave, hasChanged, publishedAd
           const hasChanges = !isMarkedForDeletion && !isNewDraft && (labelChanged || messageChanged);
 
           return (
-            <div key={a.id} style={{ ...styles.listCard, flexDirection: 'column', gap: '8px', opacity: isMarkedForDeletion ? 1 : (a.active ? 1 : 0.5), ...(isMarkedForDeletion ? styles.markedForDeletion : {}), ...(isBeingEdited ? { borderColor: '#00838f', borderWidth: '2px' } : {}), ...(!isBeingEdited && hasChanges ? styles.itemChanged : {}) }}>
+            <div key={a.id} style={{
+              ...styles.listCard,
+              flexDirection: 'column',
+              gap: '8px',
+              opacity: isMarkedForDeletion ? 1 : (a.active ? 1 : 0.5),
+              ...(isMarkedForDeletion ? { ...styles.markedForDeletion, border: '1px solid rgba(244, 67, 54, 0.3)' } : {}),
+              ...(isBeingEdited ? { border: '2px solid #00838f' } : {}),
+              ...(!isBeingEdited && hasChanges ? styles.itemChanged : {}),
+            }}>
               <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '8px' }}>
                 {isNewDraft && !isMarkedForDeletion && <span style={styles.draftIndicator} title="New draft item">●</span>}
                 {isMarkedForDeletion && <span style={{ color: '#f44336', fontSize: '10px' }} title="Will be deleted on publish">🗑</span>}
@@ -1300,7 +1343,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
   itemChanged: {
     boxShadow: 'inset 0 0 0 1px rgba(255, 193, 7, 0.5), 0 0 8px rgba(255, 193, 7, 0.2)',
-    borderColor: 'rgba(255, 193, 7, 0.5)',
   },
   listHeader: {
     display: 'flex',
@@ -1332,7 +1374,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
   markedForDeletion: {
     background: 'rgba(244, 67, 54, 0.1)',
-    border: '1px solid rgba(244, 67, 54, 0.3)',
   },
   toggle: {
     width: '36px',
