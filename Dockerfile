@@ -8,8 +8,7 @@ RUN npm ci
 COPY . .
 
 # Generate Prisma client and build frontend + server
-RUN npx prisma generate
-RUN npm run build:docker
+RUN npm run build
 
 # Create empty database with schema applied (seeded on first start by the app)
 RUN npx prisma db push --skip-generate
