@@ -1,36 +1,24 @@
-import { Router } from 'express';
-import prisma from '../db.js';
+/**
+ * Advisories API Routes - CRUD operations for ticker advisories.
+ *
+ * Uses createCrudRoutes factory for standard operations.
+ * Advisories are messages shown in the bottom ticker (e.g., maintenance notices).
+ *
+ * ROUTES:
+ * - GET /api/advisories - List all advisories
+ * - POST /api/advisories - Create new advisory
+ * - PUT /api/advisories/:id - Update advisory
+ * - DELETE /api/advisories/:id - Mark for deletion
+ * - POST /api/advisories/:id/unmark - Undo mark for deletion
+ *
+ * RELATED FILES:
+ * - server/utils/createCrudRoutes.ts - Factory that generates these routes
+ * - src/types.ts - Advisory type definition
+ */
+import { createCrudRoutes } from '../utils/createCrudRoutes.js';
+import type { Advisory } from '@prisma/client';
 
-const router = Router();
-
-router.get('/', async (_req, res) => {
-  const advisories = await prisma.advisory.findMany({ where: { deletedAt: null } });
-  res.json(advisories);
+export default createCrudRoutes<Advisory>({
+  model: 'advisory',
+  // No orderBy - advisories don't have sortOrder
 });
-
-router.post('/', async (req, res) => {
-  const advisory = await prisma.advisory.create({ data: req.body });
-  res.json(advisory);
-});
-
-router.put('/:id', async (req, res) => {
-  const advisory = await prisma.advisory.update({
-    where: { id: Number(req.params.id) },
-    data: req.body,
-  });
-  res.json(advisory);
-});
-
-// Mark for deletion (draft) - will be actually deleted on publish
-router.delete('/:id', async (req, res) => {
-  await prisma.advisory.update({ where: { id: Number(req.params.id) }, data: { markedForDeletion: true } });
-  res.json({ ok: true });
-});
-
-// Unmark for deletion (undo in draft)
-router.post('/:id/unmark', async (req, res) => {
-  await prisma.advisory.update({ where: { id: Number(req.params.id) }, data: { markedForDeletion: false } });
-  res.json({ ok: true });
-});
-
-export default router;

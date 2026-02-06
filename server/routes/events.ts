@@ -1,44 +1,56 @@
-import { Router } from 'express';
-import prisma from '../db.js';
+/**
+ * Events API Routes - CRUD operations for dashboard event cards.
+ *
+ * Uses createCrudRoutes factory with custom transforms for JSON details field.
+ * Events are announcement cards shown on the main dashboard.
+ *
+ * ROUTES:
+ * - GET /api/events - List all events (details parsed from JSON)
+ * - POST /api/events - Create new event (details stringified)
+ * - PUT /api/events/:id - Update event (details stringified if present)
+ * - DELETE /api/events/:id - Mark for deletion
+ * - POST /api/events/:id/unmark - Undo mark for deletion
+ *
+ * GOTCHAS / AI AGENT NOTES:
+ * - The `details` field is stored as JSON string in the database
+ * - API accepts/returns details as an array of strings
+ * - transformGet parses JSON, transformCreate/Update stringify it
+ *
+ * RELATED FILES:
+ * - server/utils/createCrudRoutes.ts - Factory that generates these routes
+ * - src/types.ts - Event type definition
+ */
+import { createCrudRoutes } from '../utils/createCrudRoutes.js';
+import type { Event } from '@prisma/client';
 
-const router = Router();
-
-const parseEventDetails = (e: any) => ({ ...e, details: JSON.parse(e.details) });
-
-router.get('/', async (_req, res) => {
-  const events = await prisma.event.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } });
-  res.json(events.map(parseEventDetails));
+// Parse JSON details field when reading from DB
+const parseEventDetails = (e: Event): Event & { details: string[] } => ({
+  ...e,
+  details: JSON.parse(e.details) as string[],
 });
 
-router.post('/', async (req, res) => {
-  const { details, ...rest } = req.body;
-  const event = await prisma.event.create({
-    data: { ...rest, details: JSON.stringify(details || []) },
-  });
-  res.json(parseEventDetails(event));
-});
+// Stringify details array when creating
+const transformCreate = (data: Record<string, unknown>): Record<string, unknown> => {
+  const { details, ...rest } = data;
+  return {
+    ...rest,
+    details: JSON.stringify(details || []),
+  };
+};
 
-router.put('/:id', async (req, res) => {
-  const { details, ...rest } = req.body;
-  const data: any = { ...rest };
-  if (details !== undefined) data.details = JSON.stringify(details);
-  const event = await prisma.event.update({
-    where: { id: Number(req.params.id) },
-    data,
-  });
-  res.json(parseEventDetails(event));
-});
+// Stringify details array when updating (only if present)
+const transformUpdate = (data: Record<string, unknown>): Record<string, unknown> => {
+  const { details, ...rest } = data;
+  if (details !== undefined) {
+    return { ...rest, details: JSON.stringify(details) };
+  }
+  return rest;
+};
 
-// Mark for deletion (draft) - will be actually deleted on publish
-router.delete('/:id', async (req, res) => {
-  await prisma.event.update({ where: { id: Number(req.params.id) }, data: { markedForDeletion: true } });
-  res.json({ ok: true });
+export default createCrudRoutes<Event>({
+  model: 'event',
+  orderBy: { sortOrder: 'asc' },
+  transformCreate,
+  transformUpdate,
+  transformGet: parseEventDetails,
 });
-
-// Unmark for deletion (undo in draft)
-router.post('/:id/unmark', async (req, res) => {
-  await prisma.event.update({ where: { id: Number(req.params.id) }, data: { markedForDeletion: false } });
-  res.json({ ok: true });
-});
-
-export default router;

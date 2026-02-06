@@ -11,6 +11,7 @@ import configRouter from './routes/config.js';
 import snapshotsRouter from './routes/snapshots.js';
 import prisma from './db.js';
 import { sseHandler } from './sse.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -43,6 +44,9 @@ app.post('/api/upload', upload.single('file'), (req: any, res: any) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   res.json({ url: `/images/uploads/${req.file.filename}` });
 });
+
+// Global error handler - MUST be after all routes
+app.use(errorHandler);
 
 async function seedIfEmpty() {
   const count = await prisma.service.count();
