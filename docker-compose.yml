@@ -1,0 +1,15 @@
+services:
+  dashboard:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - db-data:/app/prisma
+      - uploads:/app/public/images/uploads
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+
+volumes:
+  db-data:
+  uploads:

@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-server
+prisma/dev.db
+prisma/dev.db-journal
+.git
+.env
+.beads
+AGENTS.md
