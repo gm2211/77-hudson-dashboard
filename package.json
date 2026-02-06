@@ -5,9 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch server/index.ts",
-    "build": "vite build",
+    "build": "prisma generate && vite build && npm run build:server",
     "build:server": "esbuild server/index.ts --bundle --platform=node --format=esm --outdir=dist-server --packages=external",
-    "build:docker": "npm run build && npm run build:server",
     "start": "NODE_ENV=production node dist-server/index.js"
   },
   "dependencies": {
