@@ -87,8 +87,10 @@ const markedForDeletionStyle: CSSProperties = {
 
 /** Style for items with changes */
 const itemChangedStyle: CSSProperties = {
-  background: 'rgba(255, 193, 7, 0.08)',
-  boxShadow: 'inset 0 0 12px rgba(255, 193, 7, 0.2), 0 0 8px rgba(255, 193, 7, 0.15)',
+  background: 'rgba(255, 193, 7, 0.06)',
+  outline: '1px solid rgba(255, 193, 7, 0.4)',
+  outlineOffset: '-1px',
+  boxShadow: 'inset 0 0 16px rgba(255, 193, 7, 0.12)',
 };
 
 /** Draft indicator style */
@@ -237,7 +239,7 @@ export function ServicesSection({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'minmax(120px, 1fr) 110px 1fr auto',
+              gridTemplateColumns: 'minmax(120px, 1fr) 140px 1fr auto',
               background: 'rgba(0, 0, 0, 0.2)',
             }}
           >
@@ -305,7 +307,7 @@ export function ServicesSection({
                 key={s.id}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'minmax(120px, 1fr) 110px 1fr auto',
+                  gridTemplateColumns: 'minmax(120px, 1fr) 140px 1fr auto',
                   borderTop: isMarkedForDeletion
                     ? '1px solid rgba(244, 67, 54, 0.3)'
                     : '1px solid rgba(255, 255, 255, 0.03)',
