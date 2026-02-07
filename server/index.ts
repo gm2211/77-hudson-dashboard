@@ -4,6 +4,7 @@ import express from 'express';
 
 import app from './app.js';
 import prisma from './db.js';
+import { DEFAULT_SPEEDS } from './constants.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -79,9 +80,9 @@ async function seedSnapshot() {
 
   // Must match the section-based format used by getCurrentState() in snapshots.ts
   const [services, events, advisories, config] = await Promise.all([
-    prisma.service.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } }),
-    prisma.event.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } }),
-    prisma.advisory.findMany({ where: { deletedAt: null } }),
+    prisma.service.findMany({ orderBy: { sortOrder: 'asc' } }),
+    prisma.event.findMany({ orderBy: { sortOrder: 'asc' } }),
+    prisma.advisory.findMany(),
     prisma.buildingConfig.findFirst(),
   ]);
 
@@ -94,20 +95,20 @@ async function seedSnapshot() {
         id: s.id, name: s.name, status: s.status, notes: s.notes,
         lastChecked: s.lastChecked.toISOString(), sortOrder: s.sortOrder,
       })),
-      scrollSpeed: config?.servicesScrollSpeed ?? 8,
+      scrollSpeed: config?.servicesScrollSpeed ?? DEFAULT_SPEEDS.SERVICES,
     },
     events: {
       items: events.map(e => ({
         id: e.id, title: e.title, subtitle: e.subtitle, details: JSON.parse(e.details),
         imageUrl: e.imageUrl, accentColor: e.accentColor, sortOrder: e.sortOrder,
       })),
-      scrollSpeed: config?.scrollSpeed ?? 30,
+      scrollSpeed: config?.scrollSpeed ?? DEFAULT_SPEEDS.EVENTS,
     },
     advisories: {
       items: advisories.map(a => ({
         id: a.id, label: a.label, message: a.message, active: a.active,
       })),
-      tickerSpeed: config?.tickerSpeed ?? 25,
+      tickerSpeed: config?.tickerSpeed ?? DEFAULT_SPEEDS.TICKER,
     },
   };
 

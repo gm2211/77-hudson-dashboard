@@ -4,40 +4,61 @@ import path from 'path';
 import fs from 'fs';
 import app from '../../server/app.js';
 
+const fixturesDir = path.resolve(__dirname, '../fixtures');
+
+// Create a small valid PNG (1x1 pixel)
+const VALID_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==',
+  'base64'
+);
+
+// Create a small valid JPEG
+const VALID_JPEG = Buffer.from(
+  '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYI4Q/SFhSRDE8KjcOPi8x/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/ALtAH//Z',
+  'base64'
+);
+
 describe('Upload API', () => {
-  it('POST /api/upload returns URL for uploaded image', async () => {
-    // Create a minimal 1x1 PNG buffer
-    const pngHeader = Buffer.from([
-      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // PNG signature
-      0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
-      0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-      0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
-      0xde, 0x00, 0x00, 0x00, 0x0c, 0x49, 0x44, 0x41,
-      0x54, 0x08, 0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0x00,
-      0x00, 0x00, 0x02, 0x00, 0x01, 0xe2, 0x21, 0xbc,
-      0x33, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e,
-      0x44, 0xae, 0x42, 0x60, 0x82,
-    ]);
-
-    const res = await request(app)
-      .post('/api/upload')
-      .attach('file', pngHeader, 'test.png');
-
-    expect(res.status).toBe(200);
-    expect(res.body.url).toBeDefined();
-    expect(res.body.url).toContain('/images/uploads/');
-    expect(res.body.url).toContain('.png');
-
-    // Clean up uploaded file
-    const uploadPath = path.resolve(process.cwd(), 'public', res.body.url.slice(1));
-    if (fs.existsSync(uploadPath)) {
-      fs.unlinkSync(uploadPath);
-    }
+  beforeAll(() => {
+    fs.mkdirSync(fixturesDir, { recursive: true });
+    fs.writeFileSync(path.join(fixturesDir, 'test.png'), VALID_PNG);
+    fs.writeFileSync(path.join(fixturesDir, 'test.jpg'), VALID_JPEG);
+    fs.writeFileSync(path.join(fixturesDir, 'test.txt'), 'not an image');
   });
 
-  it('POST /api/upload without file returns 400', async () => {
+  afterAll(() => {
+    fs.rmSync(fixturesDir, { recursive: true, force: true });
+  });
+
+  it('POST /api/upload accepts a valid PNG image', async () => {
+    const res = await request(app)
+      .post('/api/upload')
+      .attach('file', path.join(fixturesDir, 'test.png'));
+
+    expect(res.status).toBe(200);
+    expect(res.body.url).toMatch(/^\/images\/uploads\//);
+  });
+
+  it('POST /api/upload accepts a valid JPEG image', async () => {
+    const res = await request(app)
+      .post('/api/upload')
+      .attach('file', path.join(fixturesDir, 'test.jpg'));
+
+    expect(res.status).toBe(200);
+    expect(res.body.url).toMatch(/^\/images\/uploads\//);
+  });
+
+  it('POST /api/upload returns 400 when no file is sent', async () => {
     const res = await request(app).post('/api/upload');
     expect(res.status).toBe(400);
-    expect(res.body.error).toBeDefined();
+  });
+
+  it('POST /api/upload rejects non-image MIME types', async () => {
+    const res = await request(app)
+      .post('/api/upload')
+      .attach('file', path.join(fixturesDir, 'test.txt'));
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/image/i);
   });
 });

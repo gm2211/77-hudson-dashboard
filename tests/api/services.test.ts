@@ -85,17 +85,17 @@ describe('Services API', () => {
     expect(res.status).toBe(400);
   });
 
-  it('excludes soft-deleted services (deletedAt set)', async () => {
+  it('returns all services regardless of deletedAt field', async () => {
     await testPrisma.service.create({
-      data: { name: 'Deleted', status: 'Operational', sortOrder: 0, deletedAt: new Date() },
+      data: { name: 'First', status: 'Operational', sortOrder: 0, deletedAt: new Date() },
     });
     await testPrisma.service.create({
-      data: { name: 'Active', status: 'Operational', sortOrder: 1 },
+      data: { name: 'Second', status: 'Operational', sortOrder: 1 },
     });
 
     const res = await request(app).get('/api/services');
-    expect(res.body).toHaveLength(1);
-    expect(res.body[0].name).toBe('Active');
+    // deletedAt is vestigial — markedForDeletion is the real soft-delete mechanism
+    expect(res.body).toHaveLength(2);
   });
 
   it('sets Cache-Control: no-store on API responses', async () => {

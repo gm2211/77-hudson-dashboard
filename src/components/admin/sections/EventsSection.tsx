@@ -33,110 +33,19 @@
  * - src/components/admin/EventCardPreview.tsx - Card preview
  */
 import { useState, useEffect } from 'react';
-import type { CSSProperties } from 'react';
 import type { Event, BuildingConfig } from '../../../types';
 import { api } from '../../../utils/api';
 import { DEFAULTS } from '../../../constants';
 import {
-  smallBtn,
-  smallBtnDanger,
-  smallBtnSuccess,
-  smallBtnPrimary,
-  smallBtnInfo,
-  btn,
-  modalOverlay,
+  smallBtn, smallBtnDanger, smallBtnSuccess, smallBtnPrimary, smallBtnInfo,
+  btn, modalOverlay,
+  inputStyle, sectionStyle, sectionChangedStyle, formGroupStyle,
+  formLabelStyle, listHeaderStyle, listCardStyle,
+  markedForDeletionStyle, itemChangedStyle, draftIndicatorStyle,
 } from '../../../styles';
 import { ImagePicker } from '../ImagePicker';
 import { MarkdownEditor } from '../MarkdownEditor';
 import { EventCardPreview } from '../EventCardPreview';
-
-/** Input style matching the admin theme */
-const inputStyle: CSSProperties = {
-  background: '#0a1628',
-  border: '1px solid rgba(255, 255, 255, 0.08)',
-  borderRadius: '6px',
-  padding: '8px 12px',
-  color: '#e0e0e0',
-  fontSize: '14px',
-};
-
-/** Section container style */
-const sectionStyle: CSSProperties = {
-  background: '#132038',
-  borderRadius: '12px',
-  border: '1px solid #1a3050',
-  padding: '20px',
-  marginBottom: '20px',
-};
-
-/** Section with changes indicator */
-const sectionChangedStyle: CSSProperties = {
-  borderLeft: '3px solid #ffc107',
-};
-
-/** Form group container */
-const formGroupStyle: CSSProperties = {
-  background: 'rgba(0, 0, 0, 0.2)',
-  borderRadius: '8px',
-  padding: '12px',
-  marginBottom: '16px',
-  border: '1px solid rgba(255, 255, 255, 0.05)',
-};
-
-/** Form label style */
-const formLabelStyle: CSSProperties = {
-  fontSize: '11px',
-  color: '#888',
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px',
-  marginBottom: '8px',
-  display: 'block',
-};
-
-/** List header style */
-const listHeaderStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  fontSize: '12px',
-  color: '#888',
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px',
-  marginBottom: '8px',
-  paddingBottom: '6px',
-  borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-};
-
-/** List card style */
-const listCardStyle: CSSProperties = {
-  background: 'rgba(0, 0, 0, 0.15)',
-  borderRadius: '8px',
-  padding: '12px 14px',
-  marginBottom: '8px',
-  border: '1px solid rgba(255, 255, 255, 0.03)',
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-};
-
-/** Style for items marked for deletion */
-const markedForDeletionStyle: CSSProperties = {
-  background: 'rgba(244, 67, 54, 0.1)',
-};
-
-/** Style for items with changes */
-const itemChangedStyle: CSSProperties = {
-  background: 'rgba(255, 193, 7, 0.06)',
-  boxShadow: 'inset 0 0 20px rgba(255, 193, 7, 0.10)',
-};
-
-/** Draft indicator style */
-const draftIndicatorStyle: CSSProperties = {
-  color: '#ffc107',
-  fontSize: '8px',
-  flexShrink: 0,
-  marginRight: '4px',
-};
 
 interface EventsSectionProps {
   /** Current event list */

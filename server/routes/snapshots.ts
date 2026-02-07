@@ -49,7 +49,7 @@ import { Router } from 'express';
 import prisma from '../db.js';
 import { broadcast } from '../sse.js';
 import { asyncHandler, NotFoundError, ValidationError } from '../middleware/errorHandler.js';
-import { Prisma } from '@prisma/client';
+import { DEFAULT_SPEEDS } from '../constants.js';
 
 const router = Router();
 
@@ -63,9 +63,9 @@ const router = Router();
  */
 async function getCurrentState() {
   const [services, events, advisories, config] = await Promise.all([
-    prisma.service.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } }),
-    prisma.event.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } }),
-    prisma.advisory.findMany({ where: { deletedAt: null } }),
+    prisma.service.findMany({ orderBy: { sortOrder: 'asc' } }),
+    prisma.event.findMany({ orderBy: { sortOrder: 'asc' } }),
+    prisma.advisory.findMany(),
     prisma.buildingConfig.findFirst(),
   ]);
 
@@ -87,7 +87,7 @@ async function getCurrentState() {
         sortOrder: s.sortOrder,
         markedForDeletion: s.markedForDeletion,
       })),
-      scrollSpeed: config?.servicesScrollSpeed ?? 8,
+      scrollSpeed: config?.servicesScrollSpeed ?? DEFAULT_SPEEDS.SERVICES,
     },
     events: {
       items: events.map(e => ({
@@ -100,7 +100,7 @@ async function getCurrentState() {
         sortOrder: e.sortOrder,
         markedForDeletion: e.markedForDeletion,
       })),
-      scrollSpeed: config?.scrollSpeed ?? 30,
+      scrollSpeed: config?.scrollSpeed ?? DEFAULT_SPEEDS.EVENTS,
     },
     advisories: {
       items: advisories.map(a => ({
@@ -110,7 +110,7 @@ async function getCurrentState() {
         active: a.active,
         markedForDeletion: a.markedForDeletion,
       })),
-      tickerSpeed: config?.tickerSpeed ?? 25,
+      tickerSpeed: config?.tickerSpeed ?? DEFAULT_SPEEDS.TICKER,
     },
   };
 }
@@ -174,6 +174,7 @@ interface ServiceItem {
   notes?: string;
   sortOrder: number;
   lastChecked: string;
+  markedForDeletion?: boolean;
 }
 
 interface EventItem {
@@ -184,6 +185,7 @@ interface EventItem {
   imageUrl: string;
   accentColor: string;
   sortOrder: number;
+  markedForDeletion?: boolean;
 }
 
 interface AdvisoryItem {
@@ -191,6 +193,7 @@ interface AdvisoryItem {
   label: string;
   message: string;
   active: boolean;
+  markedForDeletion?: boolean;
 }
 
 /**
@@ -256,9 +259,9 @@ async function restoreFromSnapshot(data: SnapshotData): Promise<void> {
           buildingNumber: data.config?.buildingNumber ?? existing.buildingNumber,
           buildingName: data.config?.buildingName ?? existing.buildingName,
           subtitle: data.config?.subtitle ?? existing.subtitle,
-          scrollSpeed: data.events?.scrollSpeed ?? 30,
-          tickerSpeed: data.advisories?.tickerSpeed ?? 25,
-          servicesScrollSpeed: data.services?.scrollSpeed ?? 8,
+          scrollSpeed: data.events?.scrollSpeed ?? DEFAULT_SPEEDS.EVENTS,
+          tickerSpeed: data.advisories?.tickerSpeed ?? DEFAULT_SPEEDS.TICKER,
+          servicesScrollSpeed: data.services?.scrollSpeed ?? DEFAULT_SPEEDS.SERVICES,
         },
       });
     }
@@ -293,83 +296,61 @@ function hasFieldChanges(from: Record<string, unknown>, to: Record<string, unkno
   return fields.some(f => String(from[f] ?? '') !== String(to[f] ?? ''));
 }
 
+/**
+ * Diff a single section (services, events, or advisories) between two snapshots.
+ * Builds added/removed/changed lists by comparing items by ID.
+ */
+function diffSection<T extends { id: number; markedForDeletion?: boolean }>(
+  fromItems: T[],
+  toItems: T[],
+  hasChanges: (from: T, to: T) => boolean,
+) {
+  const fromMap = new Map(fromItems.map(item => [item.id, item]));
+  const toMap = new Map(toItems.filter(item => !item.markedForDeletion).map(item => [item.id, item]));
+
+  const added: T[] = [];
+  const removed: T[] = [];
+  const changed: { from: T; to: T }[] = [];
+
+  for (const [id, toItem] of toMap) {
+    const fromItem = fromMap.get(id);
+    if (!fromItem) {
+      added.push(toItem);
+    } else if (hasChanges(fromItem, toItem)) {
+      changed.push({ from: fromItem, to: toItem });
+    }
+  }
+  for (const [id, fromItem] of fromMap) {
+    if (!toMap.has(id)) {
+      removed.push(fromItem);
+    }
+  }
+
+  return { added, removed, changed };
+}
+
 /** Compute diff between two snapshots. */
 function computeDiff(from: SnapshotData, to: SnapshotData) {
   const diff = {
-    services: { added: [] as ServiceItem[], removed: [] as ServiceItem[], changed: [] as { from: ServiceItem; to: ServiceItem }[] },
-    events: { added: [] as EventItem[], removed: [] as EventItem[], changed: [] as { from: EventItem; to: EventItem }[] },
-    advisories: { added: [] as AdvisoryItem[], removed: [] as AdvisoryItem[], changed: [] as { from: AdvisoryItem; to: AdvisoryItem }[] },
+    services: diffSection(
+      from.services?.items || [],
+      to.services?.items || [],
+      (a, b) => hasFieldChanges(a as Record<string, unknown>, b as Record<string, unknown>, ['name', 'status', 'notes']),
+    ),
+    events: diffSection(
+      from.events?.items || [],
+      to.events?.items || [],
+      (a, b) =>
+        hasFieldChanges(a as Record<string, unknown>, b as Record<string, unknown>, ['title', 'subtitle', 'imageUrl']) ||
+        JSON.stringify(a.details) !== JSON.stringify(b.details),
+    ),
+    advisories: diffSection(
+      from.advisories?.items || [],
+      to.advisories?.items || [],
+      (a, b) => hasFieldChanges(a as Record<string, unknown>, b as Record<string, unknown>, ['label', 'message', 'active']),
+    ),
     config: { changed: [] as { field: string; from: unknown; to: unknown }[] },
   };
-
-  // Services diff
-  const fromServicesMap = new Map((from.services?.items || []).map(s => [s.id, s]));
-  const toServicesMap = new Map(
-    (to.services?.items || []).filter(s => !(s as unknown as { markedForDeletion?: boolean }).markedForDeletion).map(s => [s.id, s])
-  );
-
-  for (const [id, service] of toServicesMap) {
-    if (!fromServicesMap.has(id)) {
-      diff.services.added.push(service);
-    } else {
-      const fromService = fromServicesMap.get(id)!;
-      if (hasFieldChanges(fromService as unknown as Record<string, unknown>, service as unknown as Record<string, unknown>, ['name', 'status', 'notes'])) {
-        diff.services.changed.push({ from: fromService, to: service });
-      }
-    }
-  }
-  for (const [id, service] of fromServicesMap) {
-    if (!toServicesMap.has(id)) {
-      diff.services.removed.push(service);
-    }
-  }
-
-  // Events diff
-  const fromEventsMap = new Map((from.events?.items || []).map(e => [e.id, e]));
-  const toEventsMap = new Map(
-    (to.events?.items || []).filter(e => !(e as unknown as { markedForDeletion?: boolean }).markedForDeletion).map(e => [e.id, e])
-  );
-
-  for (const [id, event] of toEventsMap) {
-    if (!fromEventsMap.has(id)) {
-      diff.events.added.push(event);
-    } else {
-      const fromEvent = fromEventsMap.get(id)!;
-      if (
-        hasFieldChanges(fromEvent as unknown as Record<string, unknown>, event as unknown as Record<string, unknown>, ['title', 'subtitle', 'imageUrl']) ||
-        JSON.stringify(fromEvent.details) !== JSON.stringify(event.details)
-      ) {
-        diff.events.changed.push({ from: fromEvent, to: event });
-      }
-    }
-  }
-  for (const [id, event] of fromEventsMap) {
-    if (!toEventsMap.has(id)) {
-      diff.events.removed.push(event);
-    }
-  }
-
-  // Advisories diff
-  const fromAdvisoriesMap = new Map((from.advisories?.items || []).map(a => [a.id, a]));
-  const toAdvisoriesMap = new Map(
-    (to.advisories?.items || []).filter(a => !(a as unknown as { markedForDeletion?: boolean }).markedForDeletion).map(a => [a.id, a])
-  );
-
-  for (const [id, advisory] of toAdvisoriesMap) {
-    if (!fromAdvisoriesMap.has(id)) {
-      diff.advisories.added.push(advisory);
-    } else {
-      const fromAdvisory = fromAdvisoriesMap.get(id)!;
-      if (hasFieldChanges(fromAdvisory as unknown as Record<string, unknown>, advisory as unknown as Record<string, unknown>, ['label', 'message', 'active'])) {
-        diff.advisories.changed.push({ from: fromAdvisory, to: advisory });
-      }
-    }
-  }
-  for (const [id, advisory] of fromAdvisoriesMap) {
-    if (!toAdvisoriesMap.has(id)) {
-      diff.advisories.removed.push(advisory);
-    }
-  }
 
   // Config diff
   const fromConfig = from.config || {};
@@ -383,14 +364,14 @@ function computeDiff(from: SnapshotData, to: SnapshotData) {
   }
 
   // Scroll speed changes
-  if ((from.services?.scrollSpeed ?? 8) !== (to.services?.scrollSpeed ?? 8)) {
-    diff.config.changed.push({ field: 'Services Page Speed', from: from.services?.scrollSpeed ?? 8, to: to.services?.scrollSpeed ?? 8 });
+  if ((from.services?.scrollSpeed ?? DEFAULT_SPEEDS.SERVICES) !== (to.services?.scrollSpeed ?? DEFAULT_SPEEDS.SERVICES)) {
+    diff.config.changed.push({ field: 'Services Page Speed', from: from.services?.scrollSpeed ?? DEFAULT_SPEEDS.SERVICES, to: to.services?.scrollSpeed ?? DEFAULT_SPEEDS.SERVICES });
   }
-  if ((from.events?.scrollSpeed ?? 30) !== (to.events?.scrollSpeed ?? 30)) {
-    diff.config.changed.push({ field: 'Events Scroll Speed', from: from.events?.scrollSpeed ?? 30, to: to.events?.scrollSpeed ?? 30 });
+  if ((from.events?.scrollSpeed ?? DEFAULT_SPEEDS.EVENTS) !== (to.events?.scrollSpeed ?? DEFAULT_SPEEDS.EVENTS)) {
+    diff.config.changed.push({ field: 'Events Scroll Speed', from: from.events?.scrollSpeed ?? DEFAULT_SPEEDS.EVENTS, to: to.events?.scrollSpeed ?? DEFAULT_SPEEDS.EVENTS });
   }
-  if ((from.advisories?.tickerSpeed ?? 25) !== (to.advisories?.tickerSpeed ?? 25)) {
-    diff.config.changed.push({ field: 'Ticker Speed', from: from.advisories?.tickerSpeed ?? 25, to: to.advisories?.tickerSpeed ?? 25 });
+  if ((from.advisories?.tickerSpeed ?? DEFAULT_SPEEDS.TICKER) !== (to.advisories?.tickerSpeed ?? DEFAULT_SPEEDS.TICKER)) {
+    diff.config.changed.push({ field: 'Ticker Speed', from: from.advisories?.tickerSpeed ?? DEFAULT_SPEEDS.TICKER, to: to.advisories?.tickerSpeed ?? DEFAULT_SPEEDS.TICKER });
   }
 
   return diff;

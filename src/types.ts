@@ -30,8 +30,9 @@ export interface Service {
   /**
    * Draft deletion flag - item will be hard-deleted on publish.
    * While true, shows strikethrough in admin with undo option.
+   * Always returned by the API.
    */
-  markedForDeletion?: boolean;
+  markedForDeletion: boolean;
 }
 
 /**
@@ -58,8 +59,8 @@ export interface Event {
   accentColor: string;
   /** Display order (lower = first in scroll) */
   sortOrder: number;
-  /** Draft deletion flag */
-  markedForDeletion?: boolean;
+  /** Draft deletion flag. Always returned by the API. */
+  markedForDeletion: boolean;
 }
 
 /**
@@ -77,8 +78,8 @@ export interface Advisory {
   message: string;
   /** Whether this advisory appears in the ticker (can disable without deleting) */
   active: boolean;
-  /** Draft deletion flag */
-  markedForDeletion?: boolean;
+  /** Draft deletion flag. Always returned by the API. */
+  markedForDeletion: boolean;
 }
 
 /**

@@ -62,9 +62,9 @@ export default function ServiceTable({ services, scrollSpeed = DEFAULTS.SERVICES
   const visibleServices = services.slice(startIdx, startIdx + VISIBLE_ROWS);
 
   // Pad with empty rows if needed to maintain consistent height
-  const paddedServices = [...visibleServices];
+  const paddedServices: (Service | null)[] = [...visibleServices];
   while (paddedServices.length < VISIBLE_ROWS && needsScroll) {
-    paddedServices.push(null as unknown as Service);
+    paddedServices.push(null);
   }
 
   const colgroup = (
