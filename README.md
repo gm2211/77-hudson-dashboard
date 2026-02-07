@@ -2,16 +2,32 @@
 
 A digital signage dashboard for residential building lobbies. Displays real-time service status, upcoming events, and scrolling advisories on lobby screens.
 
-## Deploy to Render
+## Deploy
+
+### Heroku (recommended — true one-click)
+
+[![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/gm2211/77-hudson-dashboard)
+
+Click the button, pick an app name, and deploy. Heroku auto-provisions PostgreSQL, runs migrations, and seeds demo data. Auto-deploys on every push. Requires a Heroku account (Postgres starts at $5/mo).
+
+### Render
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/gm2211/77-hudson-dashboard)
 
-Click the button above. Render reads `render.yaml` and auto-provisions:
-- A PostgreSQL database
-- A web service running the app
-- `DATABASE_URL` wired up automatically
+Click the button above. Render reads `render.yaml` and auto-provisions a PostgreSQL database and web service. The app seeds itself with demo data on first start. Free tier available (DB expires after 90 days).
 
-No manual configuration needed. The app seeds itself with demo data on first start.
+> **Note:** The quick deploy button uses the repo as a public URL. This means **auto-deploy on push** won't be available. For auto-deploy, use the full setup below.
+
+<details>
+<summary><strong>Render full setup (enables auto-deploy)</strong></summary>
+
+1. **Fork this repo** — Click [Fork](https://github.com/gm2211/77-hudson-dashboard/fork) to create your own copy
+2. **Connect GitHub to Render** — Go to [Render Dashboard](https://dashboard.render.com) and connect your GitHub account under Account Settings if you haven't already
+3. **Create a Blueprint** — Go to [New Blueprint](https://dashboard.render.com/select-repo?type=blueprint) and select your forked repo from the list (don't paste a URL)
+4. **Apply** — Render reads `render.yaml` and creates the database + web service with `DATABASE_URL` wired up automatically
+5. **Done** — Every push to `main` will now auto-deploy
+
+</details>
 
 ## Local Development
 

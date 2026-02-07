@@ -1,0 +1,22 @@
+{
+  "name": "77-hudson-dashboard",
+  "description": "Digital signage dashboard for residential building lobbies",
+  "repository": "https://github.com/gm2211/77-hudson-dashboard",
+  "keywords": ["node", "express", "react", "prisma", "dashboard"],
+  "addons": [
+    {
+      "plan": "heroku-postgresql:essential-0"
+    }
+  ],
+  "buildpacks": [
+    { "url": "heroku/nodejs" }
+  ],
+  "scripts": {
+    "postdeploy": "npx prisma db push --skip-generate"
+  },
+  "env": {
+    "NODE_ENV": {
+      "value": "production"
+    }
+  }
+}
