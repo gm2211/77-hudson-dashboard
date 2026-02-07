@@ -8,7 +8,8 @@
  * BEHAVIOR:
  * - "No image" option clears the value
  * - Preset options set the URL directly from IMAGE_PRESETS
- * - "Custom URL..." reveals an input field and upload button
+ * - "Upload file..." triggers a file picker directly from the dropdown
+ * - "Custom URL..." reveals an input field for pasting a URL
  * - File uploads go to /api/upload and return the URL
  *
  * PROPS:
@@ -19,7 +20,7 @@
  * GOTCHAS / AI AGENT NOTES:
  * - When adding new presets, update IMAGE_PRESETS in src/constants/status.ts
  * - Uploaded images are stored in public/images/uploads/
- * - The __custom__ value is internal only, never passed to onChange
+ * - The __custom__ and __upload__ values are internal only, never passed to onChange
  *
  * RELATED FILES:
  * - src/constants/status.ts - IMAGE_PRESETS array
@@ -28,7 +29,6 @@
 import { useState, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import { IMAGE_PRESETS } from '../../constants';
-import { smallBtn } from '../../styles';
 
 /** Input style matching the admin theme */
 const inputStyle: CSSProperties = {
@@ -56,7 +56,9 @@ export function ImagePicker({ value, onChange, label }: ImagePickerProps) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleSelect = (v: string) => {
-    if (v === '__custom__') {
+    if (v === '__upload__') {
+      fileRef.current?.click();
+    } else if (v === '__custom__') {
       setShowCustom(true);
       onChange('');
     } else if (v === '') {
@@ -93,27 +95,23 @@ export function ImagePicker({ value, onChange, label }: ImagePickerProps) {
               {p.label}
             </option>
           ))}
+          <option value="__upload__">Upload file...</option>
           <option value="__custom__">Custom URL...</option>
         </select>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleUpload}
+        />
         {showCustom && (
-          <>
-            <input
-              style={{ ...inputStyle, flex: 1 }}
-              placeholder="https://..."
-              value={value}
-              onChange={e => onChange(e.target.value)}
-            />
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={handleUpload}
-            />
-            <button style={smallBtn} onClick={() => fileRef.current?.click()}>
-              Upload
-            </button>
-          </>
+          <input
+            style={{ ...inputStyle, flex: 1 }}
+            placeholder="https://..."
+            value={value}
+            onChange={e => onChange(e.target.value)}
+          />
         )}
       </div>
     </div>
