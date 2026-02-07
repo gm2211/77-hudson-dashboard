@@ -17,8 +17,7 @@ Click the button above. Render reads `render.yaml` and auto-provisions a Postgre
 1. **Fork this repo** — Click [Fork](https://github.com/gm2211/77-hudson-dashboard/fork) to create your own copy
 2. **Connect GitHub to Render** — Go to [Render Dashboard](https://dashboard.render.com) and connect your GitHub account under Account Settings if you haven't already
 3. **Create a Blueprint** — Go to [New Blueprint](https://dashboard.render.com/select-repo?type=blueprint) and select your forked repo from the list (don't paste a URL)
-4. **Apply** — Render reads `render.yaml` and creates the database + web service with `DATABASE_URL` wired up automatically
-5. **Done** — Every push to `main` will now auto-deploy
+4. **Done** — Every push to `main` will now auto-deploy
 
 </details>
 
