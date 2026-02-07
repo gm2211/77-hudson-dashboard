@@ -295,83 +295,61 @@ function hasFieldChanges(from: Record<string, unknown>, to: Record<string, unkno
   return fields.some(f => String(from[f] ?? '') !== String(to[f] ?? ''));
 }
 
+/**
+ * Diff a single section (services, events, or advisories) between two snapshots.
+ * Builds added/removed/changed lists by comparing items by ID.
+ */
+function diffSection<T extends { id: number; markedForDeletion?: boolean }>(
+  fromItems: T[],
+  toItems: T[],
+  hasChanges: (from: T, to: T) => boolean,
+) {
+  const fromMap = new Map(fromItems.map(item => [item.id, item]));
+  const toMap = new Map(toItems.filter(item => !item.markedForDeletion).map(item => [item.id, item]));
+
+  const added: T[] = [];
+  const removed: T[] = [];
+  const changed: { from: T; to: T }[] = [];
+
+  for (const [id, toItem] of toMap) {
+    const fromItem = fromMap.get(id);
+    if (!fromItem) {
+      added.push(toItem);
+    } else if (hasChanges(fromItem, toItem)) {
+      changed.push({ from: fromItem, to: toItem });
+    }
+  }
+  for (const [id, fromItem] of fromMap) {
+    if (!toMap.has(id)) {
+      removed.push(fromItem);
+    }
+  }
+
+  return { added, removed, changed };
+}
+
 /** Compute diff between two snapshots. */
 function computeDiff(from: SnapshotData, to: SnapshotData) {
   const diff = {
-    services: { added: [] as ServiceItem[], removed: [] as ServiceItem[], changed: [] as { from: ServiceItem; to: ServiceItem }[] },
-    events: { added: [] as EventItem[], removed: [] as EventItem[], changed: [] as { from: EventItem; to: EventItem }[] },
-    advisories: { added: [] as AdvisoryItem[], removed: [] as AdvisoryItem[], changed: [] as { from: AdvisoryItem; to: AdvisoryItem }[] },
+    services: diffSection(
+      from.services?.items || [],
+      to.services?.items || [],
+      (a, b) => hasFieldChanges(a as Record<string, unknown>, b as Record<string, unknown>, ['name', 'status', 'notes']),
+    ),
+    events: diffSection(
+      from.events?.items || [],
+      to.events?.items || [],
+      (a, b) =>
+        hasFieldChanges(a as Record<string, unknown>, b as Record<string, unknown>, ['title', 'subtitle', 'imageUrl']) ||
+        JSON.stringify(a.details) !== JSON.stringify(b.details),
+    ),
+    advisories: diffSection(
+      from.advisories?.items || [],
+      to.advisories?.items || [],
+      (a, b) => hasFieldChanges(a as Record<string, unknown>, b as Record<string, unknown>, ['label', 'message', 'active']),
+    ),
     config: { changed: [] as { field: string; from: unknown; to: unknown }[] },
   };
-
-  // Services diff
-  const fromServicesMap = new Map((from.services?.items || []).map(s => [s.id, s]));
-  const toServicesMap = new Map(
-    (to.services?.items || []).filter(s => !s.markedForDeletion).map(s => [s.id, s])
-  );
-
-  for (const [id, service] of toServicesMap) {
-    if (!fromServicesMap.has(id)) {
-      diff.services.added.push(service);
-    } else {
-      const fromService = fromServicesMap.get(id)!;
-      if (hasFieldChanges(fromService as Record<string, unknown>, service as Record<string, unknown>, ['name', 'status', 'notes'])) {
-        diff.services.changed.push({ from: fromService, to: service });
-      }
-    }
-  }
-  for (const [id, service] of fromServicesMap) {
-    if (!toServicesMap.has(id)) {
-      diff.services.removed.push(service);
-    }
-  }
-
-  // Events diff
-  const fromEventsMap = new Map((from.events?.items || []).map(e => [e.id, e]));
-  const toEventsMap = new Map(
-    (to.events?.items || []).filter(e => !e.markedForDeletion).map(e => [e.id, e])
-  );
-
-  for (const [id, event] of toEventsMap) {
-    if (!fromEventsMap.has(id)) {
-      diff.events.added.push(event);
-    } else {
-      const fromEvent = fromEventsMap.get(id)!;
-      if (
-        hasFieldChanges(fromEvent as Record<string, unknown>, event as Record<string, unknown>, ['title', 'subtitle', 'imageUrl']) ||
-        JSON.stringify(fromEvent.details) !== JSON.stringify(event.details)
-      ) {
-        diff.events.changed.push({ from: fromEvent, to: event });
-      }
-    }
-  }
-  for (const [id, event] of fromEventsMap) {
-    if (!toEventsMap.has(id)) {
-      diff.events.removed.push(event);
-    }
-  }
-
-  // Advisories diff
-  const fromAdvisoriesMap = new Map((from.advisories?.items || []).map(a => [a.id, a]));
-  const toAdvisoriesMap = new Map(
-    (to.advisories?.items || []).filter(a => !a.markedForDeletion).map(a => [a.id, a])
-  );
-
-  for (const [id, advisory] of toAdvisoriesMap) {
-    if (!fromAdvisoriesMap.has(id)) {
-      diff.advisories.added.push(advisory);
-    } else {
-      const fromAdvisory = fromAdvisoriesMap.get(id)!;
-      if (hasFieldChanges(fromAdvisory as Record<string, unknown>, advisory as Record<string, unknown>, ['label', 'message', 'active'])) {
-        diff.advisories.changed.push({ from: fromAdvisory, to: advisory });
-      }
-    }
-  }
-  for (const [id, advisory] of fromAdvisoriesMap) {
-    if (!toAdvisoriesMap.has(id)) {
-      diff.advisories.removed.push(advisory);
-    }
-  }
 
   // Config diff
   const fromConfig = from.config || {};
