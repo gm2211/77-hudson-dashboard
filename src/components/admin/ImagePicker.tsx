@@ -33,7 +33,7 @@ import { smallBtn } from '../../styles';
 /** Input style matching the admin theme */
 const inputStyle: CSSProperties = {
   background: '#0a1628',
-  border: '1px solid #1a3050',
+  border: '1px solid rgba(255, 255, 255, 0.08)',
   borderRadius: '6px',
   padding: '8px 12px',
   color: '#e0e0e0',

@@ -40,7 +40,7 @@ import { StatusSelect } from '../StatusSelect';
 /** Input style matching the admin theme */
 const inputStyle: CSSProperties = {
   background: '#0a1628',
-  border: '1px solid #1a3050',
+  border: '1px solid rgba(255, 255, 255, 0.08)',
   borderRadius: '6px',
   padding: '8px 12px',
   color: '#e0e0e0',
@@ -87,7 +87,8 @@ const markedForDeletionStyle: CSSProperties = {
 
 /** Style for items with changes */
 const itemChangedStyle: CSSProperties = {
-  boxShadow: 'inset 0 0 0 1px rgba(255, 193, 7, 0.5), 0 0 8px rgba(255, 193, 7, 0.2)',
+  background: 'rgba(255, 193, 7, 0.08)',
+  boxShadow: 'inset 0 0 12px rgba(255, 193, 7, 0.2), 0 0 8px rgba(255, 193, 7, 0.15)',
 };
 
 /** Draft indicator style */
@@ -307,9 +308,7 @@ export function ServicesSection({
                   gridTemplateColumns: 'minmax(120px, 1fr) 110px 1fr auto',
                   borderTop: isMarkedForDeletion
                     ? '1px solid rgba(244, 67, 54, 0.3)'
-                    : hasItemChanges
-                      ? '1px solid rgba(255, 193, 7, 0.5)'
-                      : '1px solid rgba(255, 255, 255, 0.03)',
+                    : '1px solid rgba(255, 255, 255, 0.03)',
                   ...(isMarkedForDeletion ? markedForDeletionStyle : {}),
                   ...(hasItemChanges ? itemChangedStyle : {}),
                 }}

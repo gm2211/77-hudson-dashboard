@@ -56,8 +56,7 @@ export default function Admin() {
   }, []);
 
   const onSave = useCallback(async () => {
-    await load();
-    await checkDraft();
+    await Promise.all([load(), checkDraft()]);
   }, [load, checkDraft]);
 
   // Lighter callback for config changes - doesn't reload config

@@ -47,7 +47,7 @@ import { LabelPicker } from '../LabelPicker';
 /** Input style matching the admin theme */
 const inputStyle: CSSProperties = {
   background: '#0a1628',
-  border: '1px solid #1a3050',
+  border: '1px solid rgba(255, 255, 255, 0.08)',
   borderRadius: '6px',
   padding: '8px 12px',
   color: '#e0e0e0',
@@ -120,7 +120,8 @@ const markedForDeletionStyle: CSSProperties = {
 
 /** Style for items with changes */
 const itemChangedStyle: CSSProperties = {
-  boxShadow: 'inset 0 0 0 1px rgba(255, 193, 7, 0.5), 0 0 8px rgba(255, 193, 7, 0.2)',
+  background: 'rgba(255, 193, 7, 0.08)',
+  boxShadow: 'inset 0 0 12px rgba(255, 193, 7, 0.2), 0 0 8px rgba(255, 193, 7, 0.15)',
 };
 
 /** Draft indicator style */
