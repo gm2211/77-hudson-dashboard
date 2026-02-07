@@ -57,9 +57,9 @@ export default function Dashboard() {
   const servicesScrollSpeed = config?.servicesScrollSpeed ?? DEFAULTS.SERVICES_SCROLL_SPEED;
 
   return (
-    <div style={styles.page}>
+    <div className="dashboard-page" style={styles.page}>
       <Header config={config} />
-      <div style={styles.body}>
+      <div className="dashboard-body" style={styles.body}>
         <ServiceTable services={services} scrollSpeed={servicesScrollSpeed} />
         <AutoScrollCards events={events} scrollSpeed={scrollSpeed} />
       </div>
@@ -75,7 +75,7 @@ export default function Dashboard() {
 
 const styles: Record<string, React.CSSProperties> = {
   page: {
-    height: '100vh',
+    minHeight: '100vh',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',

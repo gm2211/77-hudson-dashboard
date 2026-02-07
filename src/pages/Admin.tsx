@@ -108,13 +108,13 @@ export default function Admin() {
 
   return (
     <div style={{ ...styles.pageWrap, ...pendingBgStyle }}>
-      <div style={styles.page}>
-        <header style={{ ...styles.header, position: 'sticky', top: 0, zIndex: 100, background: '#0a1628' }}>
+      <div className="admin-page" style={styles.page}>
+        <header className="admin-header" style={{ ...styles.header, position: 'sticky', top: 0, zIndex: 100, background: '#0a1628' }}>
           <div>
             <h1 style={{ margin: 0 }}>Hudson Dashboard — Admin</h1>
             {hasChanges && <span style={{ color: '#ffc107', fontSize: '13px' }}>● Unpublished changes</span>}
           </div>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div className="admin-header-buttons" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <button
               style={{
                 ...headerBtn,

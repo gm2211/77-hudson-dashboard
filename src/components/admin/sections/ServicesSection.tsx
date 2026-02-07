@@ -235,6 +235,7 @@ export function ServicesSection({
         >
           {/* Header row */}
           <div
+            className="services-grid"
             style={{
               display: 'grid',
               gridTemplateColumns: 'minmax(120px, 1fr) 140px 1fr auto',
@@ -303,6 +304,7 @@ export function ServicesSection({
             return (
               <div
                 key={s.id}
+                className="services-grid"
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'minmax(120px, 1fr) 140px 1fr auto',

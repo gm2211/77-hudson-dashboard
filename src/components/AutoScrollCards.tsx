@@ -82,8 +82,8 @@ export default function AutoScrollCards({ events, scrollSpeed }: { events: Event
   }, [shouldScroll, needsScroll, scrollSpeed, events.length]);
 
   return (
-    <div style={styles.cardsWrapper}>
-      <div ref={containerRef} style={styles.cards}>
+    <div className="auto-scroll-wrapper" style={styles.cardsWrapper}>
+      <div ref={containerRef} className="auto-scroll-container" style={styles.cards}>
         <div style={styles.cardsInner}>
           <div ref={singleRef} style={styles.cardsGroup}>
             {events.map((e) => <EventCard key={`orig-${e.id}`} event={e} />)}

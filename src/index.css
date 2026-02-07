@@ -10,3 +10,67 @@ body {
   color: #333;
   overflow-x: hidden;
 }
+
+@media (max-width: 768px) {
+  /* Dashboard mobile overrides */
+  html, body {
+    overflow: auto !important;
+    height: auto !important;
+  }
+  #root {
+    height: auto !important;
+  }
+  .dashboard-page {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .dashboard-body {
+    overflow: visible !important;
+  }
+  .auto-scroll-wrapper {
+    position: static !important;
+    flex: none !important;
+  }
+  .auto-scroll-container {
+    position: static !important;
+    overflow: visible !important;
+  }
+  .service-table-container {
+    overflow: visible !important;
+  }
+  .service-table-container table {
+    min-width: 500px;
+  }
+  .service-table-wrapper {
+    overflow-x: auto !important;
+  }
+  .header-row {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 16px !important;
+  }
+
+  /* Admin mobile overrides */
+  .admin-page {
+    padding: 12px !important;
+  }
+  .admin-header {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  .admin-header-buttons {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+  .services-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+  }
+  .services-grid > div {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 4px 8px !important;
+    padding: 8px 12px !important;
+  }
+}

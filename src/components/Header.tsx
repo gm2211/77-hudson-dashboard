@@ -15,7 +15,7 @@ export default function Header({ config }: { config: BuildingConfig | null }) {
     d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
-    <header style={styles.header}>
+    <header className="header-row" style={styles.header}>
       <div style={styles.left}>
         <div style={styles.buildingNumber}>{config?.buildingNumber || '77'}</div>
         <a href="/admin" style={{ textDecoration: 'none' }}>

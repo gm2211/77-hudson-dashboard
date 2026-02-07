@@ -77,7 +77,7 @@ export default function ServiceTable({ services, scrollSpeed = DEFAULTS.SERVICES
   );
 
   return (
-    <div style={styles.container}>
+    <div className="service-table-container" style={styles.container}>
       {/* Header table - always visible */}
       <table style={{ ...styles.table, tableLayout: 'fixed', marginBottom: 0 }}>
         {colgroup}
@@ -94,6 +94,7 @@ export default function ServiceTable({ services, scrollSpeed = DEFAULTS.SERVICES
       {/* Body table - animated on page change */}
       <div
         ref={containerRef}
+        className="service-table-wrapper"
         style={{
           ...styles.tableWrapper,
           maxHeight: needsScroll ? MAX_HEIGHT : undefined,

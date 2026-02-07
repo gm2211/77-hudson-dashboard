@@ -259,7 +259,7 @@ export function AdvisoriesSection({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               <span style={{ fontSize: '10px', color: '#888' }}>Label</span>
               <LabelPicker
-                style={{ width: '200px', height: '38px' }}
+                style={{ minWidth: '120px', maxWidth: '200px', flex: '0 1 200px', height: '38px' }}
                 value={form.label}
                 onChange={label => setForm({ ...form, label })}
               />
