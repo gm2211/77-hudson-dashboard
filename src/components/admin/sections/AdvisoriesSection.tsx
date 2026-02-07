@@ -121,9 +121,7 @@ const markedForDeletionStyle: CSSProperties = {
 /** Style for items with changes */
 const itemChangedStyle: CSSProperties = {
   background: 'rgba(255, 193, 7, 0.06)',
-  outline: '1px solid rgba(255, 193, 7, 0.4)',
-  outlineOffset: '-1px',
-  boxShadow: 'inset 0 0 16px rgba(255, 193, 7, 0.12)',
+  boxShadow: 'inset 0 0 20px rgba(255, 193, 7, 0.10)',
 };
 
 /** Draft indicator style */
