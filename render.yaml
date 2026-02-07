@@ -5,7 +5,7 @@ databases:
 
 services:
   - type: web
-    name: hudson-dashboard
+    name: 77-hudson-dashboard
     runtime: node
     plan: free
     buildCommand: npm ci && npm run build
