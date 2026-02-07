@@ -42,37 +42,6 @@ npm run dev
 
 To stop Postgres: `docker compose down` (data persists in the Docker volume).
 
-## Admin Guide
-
-Navigate to `/admin` to manage content. Changes are saved as drafts until published.
-
-### Building Config
-Set the building number, name, and subtitle shown in the header.
-
-### Services
-The status table on the main dashboard.
-- Add services with name and status (Operational / Maintenance / Outage)
-- Add optional notes for context
-- Click status badge to change state
-- Use "Just Checked" to update the timestamp
-
-### Events
-Announcement cards displayed on the dashboard.
-- Add title, subtitle, and details (markdown supported)
-- Select a preset image or upload your own
-- Cards auto-scroll when content overflows
-
-### Advisories
-The yellow scrolling ticker at the bottom.
-- Add with label (e.g., "RESIDENT ADVISORY") and message
-- Toggle ON/OFF to show/hide without deleting
-
-### Publishing
-- **Publish** — Makes current drafts live
-- **Discard** — Reverts to last published state
-- **Preview** — See draft before publishing
-- **History** — View/restore previous versions
-
 ## Tech Stack
 
 - **Frontend**: React 19 + Vite + TypeScript
@@ -130,14 +99,6 @@ npx prisma db push
 4. Register in `server/app.ts`
 5. Add types to `src/types.ts`
 6. Build UI components
-
-## Configuration
-
-Scroll speeds and ticker speeds are configurable in the Admin UI:
-- Higher numbers = slower scrolling
-- Set to 0 to stop scrolling
-
-Default values are defined in `src/constants/config.ts`.
 
 ## License
 
