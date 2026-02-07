@@ -79,9 +79,9 @@ async function seedSnapshot() {
 
   // Must match the section-based format used by getCurrentState() in snapshots.ts
   const [services, events, advisories, config] = await Promise.all([
-    prisma.service.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } }),
-    prisma.event.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } }),
-    prisma.advisory.findMany({ where: { deletedAt: null } }),
+    prisma.service.findMany({ orderBy: { sortOrder: 'asc' } }),
+    prisma.event.findMany({ orderBy: { sortOrder: 'asc' } }),
+    prisma.advisory.findMany(),
     prisma.buildingConfig.findFirst(),
   ]);
 

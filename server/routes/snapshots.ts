@@ -63,9 +63,9 @@ const router = Router();
  */
 async function getCurrentState() {
   const [services, events, advisories, config] = await Promise.all([
-    prisma.service.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } }),
-    prisma.event.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } }),
-    prisma.advisory.findMany({ where: { deletedAt: null } }),
+    prisma.service.findMany({ orderBy: { sortOrder: 'asc' } }),
+    prisma.event.findMany({ orderBy: { sortOrder: 'asc' } }),
+    prisma.advisory.findMany(),
     prisma.buildingConfig.findFirst(),
   ]);
 

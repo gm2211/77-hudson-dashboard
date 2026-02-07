@@ -6,7 +6,7 @@
  * Each file can now be ~10 lines instead of ~40.
  *
  * GENERATED ROUTES:
- * - GET /         - List all items (with deletedAt: null filter, optional orderBy)
+ * - GET /         - List all items (optional orderBy)
  * - POST /        - Create new item
  * - PUT /:id      - Update item by ID
  * - DELETE /:id   - Mark item for deletion (soft delete)
@@ -75,13 +75,12 @@ export function createCrudRoutes<T>(options: CrudOptions<T>): Router {
 
   /**
    * GET / - List all items
-   * Returns items with deletedAt: null, ordered by orderBy option
+   * Returns all items, ordered by orderBy option
    */
   router.get(
     '/',
     asyncHandler(async (_req, res) => {
       const items = await getModel().findMany({
-        where: { deletedAt: null },
         orderBy,
       });
       res.json(items.map(transformGet));
