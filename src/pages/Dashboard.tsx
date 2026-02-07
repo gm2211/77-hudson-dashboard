@@ -88,8 +88,11 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
   const [needsScroll, setNeedsScroll] = useState(false);
 
   const shouldScroll = events.length > 0 && scrollSpeed > 0;
+  const isDoubled = shouldScroll && needsScroll;
+  const isDoubledRef = useRef(isDoubled);
+  isDoubledRef.current = isDoubled;
   // Only duplicate content when we actually need to scroll (content overflows)
-  const displayEvents = (shouldScroll && needsScroll) ? [...events, ...events] : events;
+  const displayEvents = isDoubled ? [...events, ...events] : events;
 
   // Check if content overflows and we need scrolling
   useEffect(() => {
@@ -98,10 +101,14 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
       setNeedsScroll(false);
       return;
     }
-    // Check after render if content overflows
+    // When content is doubled for seamless looping, scrollHeight is ~2x the
+    // real content. Measure against half so we correctly detect when original
+    // cards fit after a resize / zoom change.
     const checkOverflow = () => {
-      const overflows = container.scrollHeight > container.clientHeight;
-      setNeedsScroll(overflows);
+      const singleHeight = isDoubledRef.current
+        ? container.scrollHeight / 2
+        : container.scrollHeight;
+      setNeedsScroll(singleHeight > container.clientHeight);
     };
     checkOverflow();
     // Recheck on resize
