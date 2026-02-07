@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import multer, { MulterError } from 'multer';
+import morgan from 'morgan';
 import fs from 'fs';
 
 import servicesRouter from './routes/services.js';
@@ -42,6 +43,15 @@ const upload = multer({
 const app = express();
 
 app.use(express.json());
+
+if (process.env.NODE_ENV !== 'test') {
+  app.use(morgan('combined'));
+}
+
+// Health check
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
 
 // Prevent browser caching of API responses
 app.use('/api', (_req, res, next) => {

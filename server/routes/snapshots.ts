@@ -49,6 +49,7 @@ import { Router } from 'express';
 import prisma from '../db.js';
 import { broadcast } from '../sse.js';
 import { asyncHandler, NotFoundError, ValidationError } from '../middleware/errorHandler.js';
+import { DEFAULT_SPEEDS } from '../constants.js';
 
 const router = Router();
 
@@ -86,7 +87,7 @@ async function getCurrentState() {
         sortOrder: s.sortOrder,
         markedForDeletion: s.markedForDeletion,
       })),
-      scrollSpeed: config?.servicesScrollSpeed ?? 8,
+      scrollSpeed: config?.servicesScrollSpeed ?? DEFAULT_SPEEDS.SERVICES,
     },
     events: {
       items: events.map(e => ({
@@ -99,7 +100,7 @@ async function getCurrentState() {
         sortOrder: e.sortOrder,
         markedForDeletion: e.markedForDeletion,
       })),
-      scrollSpeed: config?.scrollSpeed ?? 30,
+      scrollSpeed: config?.scrollSpeed ?? DEFAULT_SPEEDS.EVENTS,
     },
     advisories: {
       items: advisories.map(a => ({
@@ -109,7 +110,7 @@ async function getCurrentState() {
         active: a.active,
         markedForDeletion: a.markedForDeletion,
       })),
-      tickerSpeed: config?.tickerSpeed ?? 25,
+      tickerSpeed: config?.tickerSpeed ?? DEFAULT_SPEEDS.TICKER,
     },
   };
 }
@@ -258,9 +259,9 @@ async function restoreFromSnapshot(data: SnapshotData): Promise<void> {
           buildingNumber: data.config?.buildingNumber ?? existing.buildingNumber,
           buildingName: data.config?.buildingName ?? existing.buildingName,
           subtitle: data.config?.subtitle ?? existing.subtitle,
-          scrollSpeed: data.events?.scrollSpeed ?? 30,
-          tickerSpeed: data.advisories?.tickerSpeed ?? 25,
-          servicesScrollSpeed: data.services?.scrollSpeed ?? 8,
+          scrollSpeed: data.events?.scrollSpeed ?? DEFAULT_SPEEDS.EVENTS,
+          tickerSpeed: data.advisories?.tickerSpeed ?? DEFAULT_SPEEDS.TICKER,
+          servicesScrollSpeed: data.services?.scrollSpeed ?? DEFAULT_SPEEDS.SERVICES,
         },
       });
     }
@@ -363,14 +364,14 @@ function computeDiff(from: SnapshotData, to: SnapshotData) {
   }
 
   // Scroll speed changes
-  if ((from.services?.scrollSpeed ?? 8) !== (to.services?.scrollSpeed ?? 8)) {
-    diff.config.changed.push({ field: 'Services Page Speed', from: from.services?.scrollSpeed ?? 8, to: to.services?.scrollSpeed ?? 8 });
+  if ((from.services?.scrollSpeed ?? DEFAULT_SPEEDS.SERVICES) !== (to.services?.scrollSpeed ?? DEFAULT_SPEEDS.SERVICES)) {
+    diff.config.changed.push({ field: 'Services Page Speed', from: from.services?.scrollSpeed ?? DEFAULT_SPEEDS.SERVICES, to: to.services?.scrollSpeed ?? DEFAULT_SPEEDS.SERVICES });
   }
-  if ((from.events?.scrollSpeed ?? 30) !== (to.events?.scrollSpeed ?? 30)) {
-    diff.config.changed.push({ field: 'Events Scroll Speed', from: from.events?.scrollSpeed ?? 30, to: to.events?.scrollSpeed ?? 30 });
+  if ((from.events?.scrollSpeed ?? DEFAULT_SPEEDS.EVENTS) !== (to.events?.scrollSpeed ?? DEFAULT_SPEEDS.EVENTS)) {
+    diff.config.changed.push({ field: 'Events Scroll Speed', from: from.events?.scrollSpeed ?? DEFAULT_SPEEDS.EVENTS, to: to.events?.scrollSpeed ?? DEFAULT_SPEEDS.EVENTS });
   }
-  if ((from.advisories?.tickerSpeed ?? 25) !== (to.advisories?.tickerSpeed ?? 25)) {
-    diff.config.changed.push({ field: 'Ticker Speed', from: from.advisories?.tickerSpeed ?? 25, to: to.advisories?.tickerSpeed ?? 25 });
+  if ((from.advisories?.tickerSpeed ?? DEFAULT_SPEEDS.TICKER) !== (to.advisories?.tickerSpeed ?? DEFAULT_SPEEDS.TICKER)) {
+    diff.config.changed.push({ field: 'Ticker Speed', from: from.advisories?.tickerSpeed ?? DEFAULT_SPEEDS.TICKER, to: to.advisories?.tickerSpeed ?? DEFAULT_SPEEDS.TICKER });
   }
 
   return diff;
