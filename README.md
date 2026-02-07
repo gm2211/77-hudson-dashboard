@@ -2,6 +2,8 @@
 
 A digital signage dashboard for residential building lobbies. Displays real-time service status, upcoming events, and scrolling advisories on lobby screens.
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+
 ## Features
 
 - **Service Status Board** — Track building services (Operational/Maintenance/Outage)
@@ -10,26 +12,35 @@ A digital signage dashboard for residential building lobbies. Displays real-time
 - **Admin UI** — Draft/publish workflow with version history
 - **Real-time Updates** — Server-sent events for instant refresh
 
-## Quick Start
+## Deploy to Render
 
-Requires Node.js 18+.
+Click the button above. Render reads `render.yaml` and auto-provisions:
+- A PostgreSQL database
+- A web service running the app
+- `DATABASE_URL` wired up automatically
+
+No manual configuration needed. The app seeds itself with demo data on first start.
+
+## Local Development
+
+Requires Node.js 20+ and Docker.
 
 ```bash
-./run.sh
-```
+# Start Postgres
+docker compose up -d
 
-This installs dependencies, sets up the SQLite database with sample data, and starts the server.
+# Install deps and set up database
+npm install
+npx prisma db push
+
+# Run
+npm run dev
+```
 
 - **Dashboard** (lobby display): http://localhost:3000
 - **Admin panel**: http://localhost:3000/admin
 
-### Reset to Default Data
-
-```bash
-./run.sh --reset
-```
-
-This clears the database and seeds it with sample services, events, and advisories.
+To stop Postgres: `docker compose down` (data persists in the Docker volume).
 
 ## Admin Guide
 
@@ -66,7 +77,7 @@ The yellow scrolling ticker at the bottom.
 
 - **Frontend**: React 19 + Vite + TypeScript
 - **Backend**: Express (serves API + Vite dev middleware)
-- **Database**: SQLite via Prisma ORM
+- **Database**: PostgreSQL via Prisma ORM
 - **Styling**: Inline style objects (teal/dark theme)
 
 ## Project Structure
@@ -86,15 +97,9 @@ src/
   utils/            # API client, markdown parser
 prisma/
   schema.prisma     # Data models
-  seed.ts           # Default data for --reset
 ```
 
 ## Development
-
-```bash
-npm install
-npm run dev
-```
 
 ### Database Changes
 

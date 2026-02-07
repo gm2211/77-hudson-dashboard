@@ -1,52 +1,12 @@
-import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import multer from 'multer';
-import fs from 'fs';
+import express from 'express';
 
-import servicesRouter from './routes/services.js';
-import eventsRouter from './routes/events.js';
-import advisoriesRouter from './routes/advisories.js';
-import configRouter from './routes/config.js';
-import snapshotsRouter from './routes/snapshots.js';
+import app from './app.js';
 import prisma from './db.js';
-import { sseHandler } from './sse.js';
-import { errorHandler } from './middleware/errorHandler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const app = express();
 const PORT = process.env.PORT || 3000;
-
-const uploadDir = path.resolve(__dirname, '../public/images/uploads');
-fs.mkdirSync(uploadDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
-  },
-});
-const upload = multer({ storage });
-
-app.use(express.json());
-
-app.get('/api/events-stream', sseHandler);
-
-// API routes
-app.use('/api/services', servicesRouter);
-app.use('/api/events', eventsRouter);
-app.use('/api/advisories', advisoriesRouter);
-app.use('/api/config', configRouter);
-app.use('/api/snapshots', snapshotsRouter);
-
-app.post('/api/upload', upload.single('file'), (req: any, res: any) => {
-  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  res.json({ url: `/images/uploads/${req.file.filename}` });
-});
-
-// Global error handler - MUST be after all routes
-app.use(errorHandler);
 
 async function seedIfEmpty() {
   const count = await prisma.service.count();
@@ -117,18 +77,40 @@ async function seedSnapshot() {
   const count = await prisma.publishedSnapshot.count();
   if (count > 0) return;
 
+  // Must match the section-based format used by getCurrentState() in snapshots.ts
   const [services, events, advisories, config] = await Promise.all([
     prisma.service.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } }),
     prisma.event.findMany({ where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } }),
     prisma.advisory.findMany({ where: { deletedAt: null } }),
     prisma.buildingConfig.findFirst(),
   ]);
+
   const data = {
-    services,
-    events: events.map(e => ({ ...e, details: JSON.parse(e.details) })),
-    advisories,
-    config,
+    config: config
+      ? { buildingNumber: config.buildingNumber, buildingName: config.buildingName, subtitle: config.subtitle }
+      : null,
+    services: {
+      items: services.map(s => ({
+        id: s.id, name: s.name, status: s.status, notes: s.notes,
+        lastChecked: s.lastChecked.toISOString(), sortOrder: s.sortOrder,
+      })),
+      scrollSpeed: config?.servicesScrollSpeed ?? 8,
+    },
+    events: {
+      items: events.map(e => ({
+        id: e.id, title: e.title, subtitle: e.subtitle, details: JSON.parse(e.details),
+        imageUrl: e.imageUrl, accentColor: e.accentColor, sortOrder: e.sortOrder,
+      })),
+      scrollSpeed: config?.scrollSpeed ?? 30,
+    },
+    advisories: {
+      items: advisories.map(a => ({
+        id: a.id, label: a.label, message: a.message, active: a.active,
+      })),
+      tickerSpeed: config?.tickerSpeed ?? 25,
+    },
   };
+
   await prisma.publishedSnapshot.create({ data: { version: 1, data: JSON.stringify(data) } });
 }
 

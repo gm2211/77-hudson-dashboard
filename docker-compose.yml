@@ -1,15 +1,14 @@
 services:
-  dashboard:
-    build: .
-    ports:
-      - "3000:3000"
-    volumes:
-      - db-data:/app/prisma
-      - uploads:/app/public/images/uploads
+  postgres:
+    image: postgres:15
     environment:
-      - NODE_ENV=production
-      - PORT=3000
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hudson_dashboard
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
 
 volumes:
-  db-data:
-  uploads:
+  pgdata:

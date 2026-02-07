@@ -1,17 +1,18 @@
 import { Router } from 'express';
 import prisma from '../db.js';
+import { asyncHandler } from '../middleware/errorHandler.js';
 
 const router = Router();
 
-router.get('/', async (_req, res) => {
+router.get('/', asyncHandler(async (_req, res) => {
   let config = await prisma.buildingConfig.findFirst();
   if (!config) {
     config = await prisma.buildingConfig.create({ data: {} });
   }
   res.json(config);
-});
+}));
 
-router.put('/', async (req, res) => {
+router.put('/', asyncHandler(async (req, res) => {
   let config = await prisma.buildingConfig.findFirst();
   if (!config) {
     config = await prisma.buildingConfig.create({ data: req.body });
@@ -22,6 +23,6 @@ router.put('/', async (req, res) => {
     });
   }
   res.json(config);
-});
+}));
 
 export default router;

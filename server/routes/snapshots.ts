@@ -121,8 +121,26 @@ async function getNextVersion(): Promise<number> {
   return (latest?.version ?? 0) + 1;
 }
 
-/** Transform section-based format to flat API format for frontend. */
+/** Transform section-based format to flat API format for frontend.
+ *  Also handles legacy flat format (services/events/advisories as plain arrays)
+ *  for backward compatibility with old snapshots.
+ */
 function toApiFormat(state: ReturnType<typeof getCurrentState> extends Promise<infer T> ? T : never) {
+  // Handle legacy flat format where services/events/advisories are plain arrays
+  const isLegacy = Array.isArray(state.services);
+  if (isLegacy) {
+    const legacy = state as unknown as {
+      services: unknown[]; events: unknown[]; advisories: unknown[];
+      config: Record<string, unknown> | null;
+    };
+    return {
+      services: legacy.services,
+      events: legacy.events,
+      advisories: legacy.advisories,
+      config: legacy.config,
+    };
+  }
+
   return {
     services: state.services.items,
     events: state.events.items,

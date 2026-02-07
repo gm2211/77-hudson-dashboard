@@ -45,7 +45,11 @@ export default function Dashboard() {
 
     const es = new EventSource('/api/events-stream');
     es.onmessage = () => fetchAll();
-    return () => es.close();
+    // Re-fetch on reconnect so missed broadcasts are caught
+    es.onopen = () => fetchAll();
+    // Fallback polling in case SSE drops (e.g. background tab throttling)
+    const poll = setInterval(fetchAll, 30_000);
+    return () => { es.close(); clearInterval(poll); };
   }, [fetchAll]);
 
   const scrollSpeed = config?.scrollSpeed ?? DEFAULTS.SCROLL_SPEED;

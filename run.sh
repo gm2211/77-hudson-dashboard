@@ -25,6 +25,16 @@ if [ ! -d "node_modules" ]; then
   npm install
 fi
 
+# Start Postgres if docker compose is available and not already running
+if command -v docker &> /dev/null; then
+  if ! docker compose ps --status running 2>/dev/null | grep -q postgres; then
+    echo "Starting Postgres..."
+    docker compose up -d
+    echo "Waiting for Postgres to be ready..."
+    sleep 2
+  fi
+fi
+
 # Generate Prisma client (ensures it's up to date with schema)
 echo "Generating Prisma client..."
 npx prisma generate
@@ -32,15 +42,12 @@ npx prisma generate
 # Handle database reset or initial setup
 if [ "$RESET_DB" = true ]; then
   echo "Resetting database to default state..."
-  rm -f prisma/dev.db prisma/dev.db-journal
-  npx prisma db push
+  npx prisma db push --force-reset
   echo "Seeding database..."
   npx tsx prisma/seed.ts
-elif [ ! -f "prisma/dev.db" ]; then
+else
   echo "Setting up database..."
   npx prisma db push
-  echo "Seeding database..."
-  npx tsx prisma/seed.ts
 fi
 
 echo "Starting server on http://localhost:3000"

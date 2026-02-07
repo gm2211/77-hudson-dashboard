@@ -1,0 +1,19 @@
+databases:
+  - name: hudson-dashboard-db
+    plan: free
+    databaseName: hudson_dashboard
+
+services:
+  - type: web
+    name: hudson-dashboard
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npx prisma db push --skip-generate && npm start
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hudson-dashboard-db
+          property: connectionString
+      - key: NODE_ENV
+        value: production
