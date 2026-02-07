@@ -84,22 +84,35 @@ The yellow scrolling ticker at the bottom.
 
 ```
 server/
-  index.ts          # Express server entry point
-  db.ts             # Prisma client
-  sse.ts            # Server-sent events for real-time updates
-  routes/           # REST API endpoints
+  app.ts              # Express app (routes, middleware)
+  index.ts            # Server entry point (seeding, startup)
+  db.ts               # Prisma client
+  sse.ts              # Server-sent events for real-time updates
+  routes/             # REST API endpoints
+  middleware/         # Error handling
+  utils/              # CRUD route factory
 src/
   pages/
-    Dashboard.tsx   # Lobby display (auto-scroll, real-time)
-    Admin.tsx       # Content management UI
-  components/       # Header, ServiceTable, EventCard, AdvisoryTicker
-  constants/        # Shared constants (colors, defaults, presets)
-  utils/            # API client, markdown parser
+    Dashboard.tsx     # Lobby display (auto-scroll, real-time)
+    Admin.tsx         # Content management UI
+  components/         # Header, ServiceTable, EventCard, AdvisoryTicker
+  components/admin/   # Admin-specific components and section editors
+  constants/          # Shared constants (colors, defaults, presets)
+  utils/              # API client, markdown parser
 prisma/
-  schema.prisma     # Data models
+  schema.prisma       # Data models
+tests/
+  api/                # API + DB integration tests
 ```
 
 ## Development
+
+### Running Tests
+
+```bash
+npm test              # Run tests (needs Postgres running)
+npm run test:watch    # Run tests in watch mode
+```
 
 ### Database Changes
 
@@ -114,7 +127,7 @@ npx prisma db push
 1. Add model to `prisma/schema.prisma`
 2. Run `npx prisma db push`
 3. Create route in `server/routes/`
-4. Register in `server/index.ts`
+4. Register in `server/app.ts`
 5. Add types to `src/types.ts`
 6. Build UI components
 
@@ -125,3 +138,7 @@ Scroll speeds and ticker speeds are configurable in the Admin UI:
 - Set to 0 to stop scrolling
 
 Default values are defined in `src/constants/config.ts`.
+
+## License
+
+[MIT](LICENSE)
