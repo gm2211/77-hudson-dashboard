@@ -34,7 +34,7 @@ export default function Header({ config }: { config: BuildingConfig | null }) {
 const styles: Record<string, React.CSSProperties> = {
   header: {
     background: 'linear-gradient(135deg, #1a5c5a 0%, #0f3d3b 100%)',
-    padding: '20px 40px',
+    padding: '14px 28px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -44,13 +44,13 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(255,255,255,0.12)',
     borderRadius: '10px',
     padding: '6px 14px',
-    fontSize: '28px',
+    fontSize: '24px',
     fontWeight: 700,
     color: '#fff',
   },
-  title: { fontSize: '22px', fontWeight: 700, color: '#fff', margin: 0 },
+  title: { fontSize: '20px', fontWeight: 700, color: '#fff', margin: 0 },
   subtitle: { fontSize: '13px', color: '#4dd0c8', margin: 0 },
   right: { textAlign: 'right' as const },
-  time: { fontSize: '26px', fontWeight: 700, color: '#fff' },
+  time: { fontSize: '22px', fontWeight: 700, color: '#fff' },
   date: { fontSize: '13px', color: 'rgba(255,255,255,0.65)' },
 };

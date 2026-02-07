@@ -21,7 +21,7 @@ export default function EventCard({ event }: { event: Event }) {
         {event.subtitle && <p style={styles.subtitle}>{event.subtitle}</p>}
         {detailsMarkdown.trim() && (
           <div
-            style={{ fontSize: '14px', color: '#e0e0e0', lineHeight: 1.5 }}
+            style={{ fontSize: '13px', color: '#e0e0e0', lineHeight: 1.5 }}
             dangerouslySetInnerHTML={{ __html: renderedDetails }}
           />
         )}
@@ -42,9 +42,9 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   content: {
-    padding: '24px 28px',
+    padding: '18px 22px',
   },
-  title: { fontSize: '20px', fontWeight: 700, color: '#fff', margin: '0 0 4px' },
-  subtitle: { fontSize: '14px', color: '#b0d4d0', margin: '0 0 14px', fontStyle: 'italic' },
+  title: { fontSize: '18px', fontWeight: 700, color: '#fff', margin: '0 0 4px' },
+  subtitle: { fontSize: '14px', color: '#b0d4d0', margin: '0 0 10px', fontStyle: 'italic' },
   accentBar: { height: '4px', width: '100%' },
 };

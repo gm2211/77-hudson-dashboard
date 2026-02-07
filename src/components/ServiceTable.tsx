@@ -16,9 +16,12 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-const ROW_HEIGHT = 44; // pixels per row
-const VISIBLE_ROWS = 6; // number of rows visible at once
+const ROW_HEIGHT = 40; // pixels per row
+const VISIBLE_ROWS = 10; // show all rows for typical lists, only paginate at 11+
 const MAX_HEIGHT = ROW_HEIGHT * VISIBLE_ROWS;
+
+// Column widths for table-layout: fixed alignment between header and body
+const COL_WIDTHS = { service: '35%', status: '20%', notes: '25%', lastChecked: '20%' };
 
 interface Props {
   services: Service[];
@@ -26,7 +29,6 @@ interface Props {
 }
 
 export default function ServiceTable({ services, scrollSpeed = DEFAULTS.SERVICES_SCROLL_SPEED }: Props) {
-  const hasAnyNotes = services.some(s => s.notes);
   const totalRows = services.length;
   const needsScroll = totalRows > VISIBLE_ROWS;
   const totalPages = needsScroll ? Math.ceil(totalRows / VISIBLE_ROWS) : 1;
@@ -78,15 +80,25 @@ export default function ServiceTable({ services, scrollSpeed = DEFAULTS.SERVICES
     paddedServices.push(null as unknown as Service);
   }
 
+  const colgroup = (
+    <colgroup>
+      <col style={{ width: COL_WIDTHS.service }} />
+      <col style={{ width: COL_WIDTHS.status }} />
+      <col style={{ width: COL_WIDTHS.notes }} />
+      <col style={{ width: COL_WIDTHS.lastChecked }} />
+    </colgroup>
+  );
+
   return (
     <div style={styles.container}>
       {/* Header table - always visible */}
-      <table style={{ ...styles.table, marginBottom: 0 }}>
+      <table style={{ ...styles.table, tableLayout: 'fixed', marginBottom: 0 }}>
+        {colgroup}
         <thead>
           <tr>
             <th style={styles.th}>Service</th>
             <th style={styles.th}>Status</th>
-            {hasAnyNotes && <th style={styles.th}>Notes</th>}
+            <th style={styles.th}>Notes</th>
             <th style={{ ...styles.th, textAlign: 'right' }}>Last Checked</th>
           </tr>
         </thead>
@@ -102,7 +114,8 @@ export default function ServiceTable({ services, scrollSpeed = DEFAULTS.SERVICES
           transition: 'opacity 0.3s ease-in-out',
         }}
       >
-        <table style={styles.table}>
+        <table style={{ ...styles.table, tableLayout: 'fixed' }}>
+          {colgroup}
           <tbody>
             {paddedServices.map((s, idx) => (
               s ? (
@@ -114,11 +127,9 @@ export default function ServiceTable({ services, scrollSpeed = DEFAULTS.SERVICES
                       {s.status}
                     </span>
                   </td>
-                  {hasAnyNotes && (
-                    <td style={{ ...styles.td, color: '#666', fontStyle: 'italic', fontSize: '14px' }}>
-                      {s.notes || '—'}
-                    </td>
-                  )}
+                  <td style={{ ...styles.td, color: '#666', fontStyle: 'italic', fontSize: '14px' }}>
+                    {s.notes || '—'}
+                  </td>
                   <td style={{ ...styles.td, textAlign: 'right', color: '#888' }}>
                     {timeAgo(s.lastChecked)}
                   </td>
@@ -127,7 +138,7 @@ export default function ServiceTable({ services, scrollSpeed = DEFAULTS.SERVICES
                 <tr key={`empty-${idx}`} style={{ height: ROW_HEIGHT }}>
                   <td style={styles.td}>&nbsp;</td>
                   <td style={styles.td}>&nbsp;</td>
-                  {hasAnyNotes && <td style={styles.td}>&nbsp;</td>}
+                  <td style={styles.td}>&nbsp;</td>
                   <td style={styles.td}>&nbsp;</td>
                 </tr>
               )
@@ -195,13 +206,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '13px',
     color: '#555',
     fontWeight: 600,
-    padding: '12px 24px',
+    padding: '10px 20px',
     textAlign: 'left',
     borderBottom: '1px solid #e0d8d0',
     background: '#faf8f5',
   },
   td: {
-    padding: '10px 24px',
+    padding: '8px 20px',
     fontSize: '15px',
     color: '#333',
     borderBottom: '1px solid #eee',
@@ -222,7 +233,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '8px 24px',
+    padding: '6px 20px',
     background: '#faf8f5',
     borderTop: '1px solid #e0d8d0',
   },

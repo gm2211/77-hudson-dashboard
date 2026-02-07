@@ -61,7 +61,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   track: {
     overflow: 'hidden',
-    padding: '12px 0',
+    padding: '8px 0',
   },
   scroll: {
     display: 'inline-flex',

@@ -170,10 +170,10 @@ const styles: Record<string, React.CSSProperties> = {
   body: {
     flex: 1,
     minHeight: 0, // Required for nested flex containers to shrink properly
-    padding: '20px 40px',
+    padding: '14px 28px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
+    gap: '12px',
     overflow: 'hidden',
   },
   cardsWrapper: {
@@ -192,6 +192,6 @@ const styles: Record<string, React.CSSProperties> = {
   cardsInner: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
+    gap: '12px',
   },
 };
