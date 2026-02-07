@@ -236,6 +236,17 @@ export function EventsSection({
     setForm(empty);
   };
 
+  const cloneEvent = (e: Event) => {
+    setEditingId(null);
+    setFormExpanded(true);
+    setForm({
+      title: e.title,
+      subtitle: e.subtitle,
+      details: (e.details || []).join('\n'),
+      imageUrl: e.imageUrl,
+    });
+  };
+
   return (
     <section style={{ ...sectionStyle, ...(hasChanged ? sectionChangedStyle : {}) }}>
       <h2 style={{ margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -417,6 +428,13 @@ export function EventsSection({
                       onClick={() => setPreviewEvent(e)}
                     >
                       Preview
+                    </button>
+                    <button
+                      style={{ ...smallBtn, ...smallBtnInfo }}
+                      onClick={() => cloneEvent(e)}
+                      title="Clone"
+                    >
+                      📋
                     </button>
                     <button
                       style={{ ...smallBtn, ...smallBtnPrimary }}

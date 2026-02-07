@@ -233,6 +233,12 @@ export function AdvisoriesSection({
     setForm(empty);
   };
 
+  const cloneAdvisory = (a: Advisory) => {
+    setEditingId(null);
+    setFormExpanded(true);
+    setForm({ label: a.label, message: a.message });
+  };
+
   const toggleActive = async (a: Advisory) => {
     await api.put(`/api/advisories/${a.id}`, { active: !a.active });
     onSave();
@@ -375,6 +381,13 @@ export function AdvisoriesSection({
                             transform: a.active ? 'translateX(16px)' : 'translateX(0)',
                           }}
                         />
+                      </button>
+                      <button
+                        style={{ ...smallBtn, ...smallBtnInfo }}
+                        onClick={() => cloneAdvisory(a)}
+                        title="Clone"
+                      >
+                        📋
                       </button>
                       <button
                         style={{ ...smallBtn, ...(isBeingEdited ? smallBtnInfo : smallBtnPrimary) }}
