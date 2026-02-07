@@ -86,11 +86,10 @@ export function SnapshotHistory({ onRestore, onItemRestore }: SnapshotHistoryPro
   };
 
   const restoreFull = async (version: number) => {
-    if (!confirm(`Restore entire snapshot v${version}? This will create a new version with that state.`)) return;
+    if (!confirm(`Restore entire snapshot v${version} as draft? You'll need to publish to make it live.`)) return;
     await api.post(`/api/snapshots/restore/${version}`);
     setSelectedVersion(null);
     setDiff(null);
-    api.get<Snapshot[]>('/api/snapshots').then(setSnapshots);
     onRestore();
   };
 
@@ -151,18 +150,22 @@ export function SnapshotHistory({ onRestore, onItemRestore }: SnapshotHistoryPro
                 </span>
               </div>
               <div style={{ display: 'flex', gap: '6px' }} onClick={e => e.stopPropagation()}>
-                <button
-                  style={{ ...smallBtn, ...smallBtnPrimary }}
-                  onClick={() => setPreviewVersion(s.version)}
-                >
-                  Preview
-                </button>
-                <button
-                  style={{ ...smallBtn, ...smallBtnSuccess }}
-                  onClick={() => restoreFull(s.version)}
-                >
-                  Restore All
-                </button>
+                {selectedVersion === s.version && (
+                  <>
+                    <button
+                      style={{ ...smallBtn, ...smallBtnPrimary }}
+                      onClick={() => setPreviewVersion(s.version)}
+                    >
+                      Preview
+                    </button>
+                    <button
+                      style={{ ...smallBtn, ...smallBtnSuccess }}
+                      onClick={() => restoreFull(s.version)}
+                    >
+                      Restore All
+                    </button>
+                  </>
+                )}
                 <button
                   style={{ ...smallBtn, ...smallBtnDanger }}
                   onClick={() => deleteSnapshot(s.version)}

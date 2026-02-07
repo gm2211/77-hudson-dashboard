@@ -206,5 +206,5 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid #1a3050',
     paddingBottom: '16px',
   },
-  link: { color: '#00bcd4', textDecoration: 'none', fontSize: '14px' },
+  link: { color: '#00bcd4', textDecoration: 'none', fontSize: '14px', whiteSpace: 'nowrap' },
 };

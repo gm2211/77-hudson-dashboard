@@ -18,10 +18,10 @@ export default function Header({ config }: { config: BuildingConfig | null }) {
     <header style={styles.header}>
       <div style={styles.left}>
         <div style={styles.buildingNumber}>{config?.buildingNumber || '77'}</div>
-        <div>
+        <a href="/admin" style={{ textDecoration: 'none' }}>
           <h1 style={styles.title}>{config?.buildingName || 'Building Services Status'}</h1>
           <p style={styles.subtitle}>{config?.subtitle || 'Real-time System Monitor'}</p>
-        </div>
+        </a>
       </div>
       <div style={styles.right}>
         <div style={styles.time}>{formatTime(time)}</div>

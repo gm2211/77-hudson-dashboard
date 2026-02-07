@@ -559,15 +559,7 @@ router.post(
     const data = JSON.parse(snapshot.data) as SnapshotData;
     await restoreFromSnapshot(data);
 
-    // Create new snapshot (like git revert creates a new commit)
-    const newVersion = await getNextVersion();
-    const restoredState = await getCurrentState();
-    await prisma.publishedSnapshot.create({
-      data: { version: newVersion, data: JSON.stringify(restoredState) },
-    });
-
-    broadcast();
-    res.json({ ok: true, message: `Restored to v${version} as new v${newVersion}`, newVersion });
+    res.json({ ok: true, message: `Restored v${version} as draft — publish to make it live` });
   })
 );
 
