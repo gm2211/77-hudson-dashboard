@@ -319,11 +319,207 @@ describe('Snapshots API', () => {
       // Restore to v1
       const res = await request(app).post('/api/snapshots/restore/1');
       expect(res.status).toBe(200);
-      expect(res.body.newVersion).toBe(3);
+      expect(res.body.ok).toBe(true);
 
       // Should now have 2 services again
       const services = await testPrisma.service.findMany();
       expect(services).toHaveLength(2);
+    });
+
+    it('returns 404 for non-existent version', async () => {
+      const res = await request(app).post('/api/snapshots/restore/999');
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('Selective restore (restore-items)', () => {
+    it('restores a single service from a snapshot', async () => {
+      await seedTestData();
+      await request(app).post('/api/snapshots'); // v1
+
+      // Modify the service
+      const services = await testPrisma.service.findMany();
+      await testPrisma.service.update({
+        where: { id: services[0].id },
+        data: { status: 'Outage' },
+      });
+
+      // Selectively restore just that service from v1
+      const res = await request(app)
+        .post('/api/snapshots/restore-items')
+        .send({ sourceVersion: 1, items: { services: [services[0].id] } });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.restored.services).toContain(services[0].id);
+
+      // Verify the service was restored
+      const restored = await testPrisma.service.findUnique({ where: { id: services[0].id } });
+      expect(restored?.status).toBe('Operational');
+    });
+
+    it('restores a single event from a snapshot', async () => {
+      await seedTestData();
+      await request(app).post('/api/snapshots'); // v1
+
+      const events = await testPrisma.event.findMany();
+      await testPrisma.event.update({
+        where: { id: events[0].id },
+        data: { title: 'Changed Title' },
+      });
+
+      const res = await request(app)
+        .post('/api/snapshots/restore-items')
+        .send({ sourceVersion: 1, items: { events: [events[0].id] } });
+
+      expect(res.status).toBe(200);
+      expect(res.body.restored.events).toContain(events[0].id);
+
+      const restored = await testPrisma.event.findUnique({ where: { id: events[0].id } });
+      expect(restored?.title).toBe('Yoga Class');
+    });
+
+    it('restores a single advisory from a snapshot', async () => {
+      await seedTestData();
+      await request(app).post('/api/snapshots'); // v1
+
+      const advisories = await testPrisma.advisory.findMany();
+      await testPrisma.advisory.update({
+        where: { id: advisories[0].id },
+        data: { message: 'Changed message' },
+      });
+
+      const res = await request(app)
+        .post('/api/snapshots/restore-items')
+        .send({ sourceVersion: 1, items: { advisories: [advisories[0].id] } });
+
+      expect(res.status).toBe(200);
+      expect(res.body.restored.advisories).toContain(advisories[0].id);
+
+      const restored = await testPrisma.advisory.findUnique({ where: { id: advisories[0].id } });
+      expect(restored?.message).toBe('Water shutoff tonight');
+    });
+
+    it('returns 400 when sourceVersion is missing', async () => {
+      const res = await request(app)
+        .post('/api/snapshots/restore-items')
+        .send({ items: { services: [1] } });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('Diff endpoint', () => {
+    it('returns correct diff between two snapshots', async () => {
+      await seedTestData();
+      await request(app).post('/api/snapshots'); // v1: 2 services
+
+      // Add a service and publish v2
+      await testPrisma.service.create({
+        data: { name: 'New Service', status: 'Operational', sortOrder: 99 },
+      });
+      await request(app).post('/api/snapshots'); // v2: 3 services
+
+      const res = await request(app).get('/api/snapshots/1/diff/2');
+      expect(res.status).toBe(200);
+      expect(res.body.services.added).toHaveLength(1);
+      expect(res.body.services.added[0].name).toBe('New Service');
+      expect(res.body.services.removed).toHaveLength(0);
+    });
+
+    it('returns empty diff when comparing same version', async () => {
+      await seedTestData();
+      await request(app).post('/api/snapshots'); // v1
+
+      const res = await request(app).get('/api/snapshots/1/diff/1');
+      expect(res.status).toBe(200);
+      expect(res.body.services.added).toHaveLength(0);
+      expect(res.body.services.removed).toHaveLength(0);
+      expect(res.body.services.changed).toHaveLength(0);
+      expect(res.body.events.added).toHaveLength(0);
+      expect(res.body.advisories.added).toHaveLength(0);
+    });
+
+    it('returns 404 for non-existent version', async () => {
+      const res = await request(app).get('/api/snapshots/999/diff/1');
+      expect(res.status).toBe(404);
+    });
+
+    it('supports draft comparison', async () => {
+      await seedTestData();
+      await request(app).post('/api/snapshots'); // v1
+
+      // Modify draft state
+      await testPrisma.service.create({
+        data: { name: 'Draft Service', status: 'Operational', sortOrder: 99 },
+      });
+
+      const res = await request(app).get('/api/snapshots/1/diff/draft');
+      expect(res.status).toBe(200);
+      expect(res.body.services.added).toHaveLength(1);
+      expect(res.body.services.added[0].name).toBe('Draft Service');
+    });
+  });
+
+  describe('Draft status — per-section detection', () => {
+    it('detects services changed but events unchanged', async () => {
+      await seedTestData();
+      await request(app).post('/api/snapshots');
+
+      // Only modify a service
+      const services = await testPrisma.service.findMany();
+      await testPrisma.service.update({
+        where: { id: services[0].id },
+        data: { status: 'Outage' },
+      });
+
+      const res = await request(app).get('/api/snapshots/draft-status');
+      expect(res.body.sectionChanges.services).toBe(true);
+      expect(res.body.sectionChanges.events).toBe(false);
+      expect(res.body.sectionChanges.advisories).toBe(false);
+    });
+
+    it('detects new draft items', async () => {
+      await seedTestData();
+      await request(app).post('/api/snapshots');
+
+      // Add a new event
+      await testPrisma.event.create({
+        data: {
+          title: 'New Event',
+          subtitle: '',
+          details: JSON.stringify([]),
+          imageUrl: '',
+          accentColor: '',
+          sortOrder: 99,
+        },
+      });
+
+      const res = await request(app).get('/api/snapshots/draft-status');
+      expect(res.body.sectionChanges.events).toBe(true);
+      expect(res.body.sectionChanges.services).toBe(false);
+    });
+
+    it('detects marked-for-deletion items as changes', async () => {
+      await seedTestData();
+      await request(app).post('/api/snapshots');
+
+      const advisories = await testPrisma.advisory.findMany();
+      await testPrisma.advisory.update({
+        where: { id: advisories[0].id },
+        data: { markedForDeletion: true },
+      });
+
+      const res = await request(app).get('/api/snapshots/draft-status');
+      expect(res.body.sectionChanges.advisories).toBe(true);
+    });
+  });
+
+  describe('Discard — edge cases', () => {
+    it('handles discard with no published snapshot gracefully', async () => {
+      // No data at all — no snapshots
+      const res = await request(app).post('/api/snapshots/discard');
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
     });
   });
 });
