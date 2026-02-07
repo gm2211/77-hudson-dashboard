@@ -75,7 +75,7 @@ export default function Dashboard() {
 
 const styles: Record<string, React.CSSProperties> = {
   page: {
-    minHeight: '100vh',
+    height: '100vh',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',

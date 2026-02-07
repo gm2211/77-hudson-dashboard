@@ -343,7 +343,7 @@ export function EventsSection({
                       onClick={() => cloneEvent(e)}
                       title="Clone"
                     >
-                      📋
+                      ⧉
                     </button>
                     <button
                       style={{ ...smallBtn, ...smallBtnPrimary }}

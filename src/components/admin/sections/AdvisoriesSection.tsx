@@ -297,7 +297,7 @@ export function AdvisoriesSection({
                         onClick={() => cloneAdvisory(a)}
                         title="Clone"
                       >
-                        📋
+                        ⧉
                       </button>
                       <button
                         style={{ ...smallBtn, ...(isBeingEdited ? smallBtnInfo : smallBtnPrimary) }}
