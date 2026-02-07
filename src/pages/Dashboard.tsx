@@ -85,33 +85,27 @@ export default function Dashboard() {
  */
 function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const singleRef = useRef<HTMLDivElement>(null);
+  const dupRef = useRef<HTMLDivElement>(null);
   const [needsScroll, setNeedsScroll] = useState(false);
 
   const shouldScroll = events.length > 0 && scrollSpeed > 0;
   const isDoubled = shouldScroll && needsScroll;
-  const isDoubledRef = useRef(isDoubled);
-  isDoubledRef.current = isDoubled;
-  // Only duplicate content when we actually need to scroll (content overflows)
-  const displayEvents = isDoubled ? [...events, ...events] : events;
 
-  // Check if content overflows and we need scrolling
+  // Check if content overflows and we need scrolling.
+  // Measures the single-content group directly — no ratio assumptions.
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || !shouldScroll) {
+    const singleContent = singleRef.current;
+    if (!container || !singleContent || !shouldScroll) {
       setNeedsScroll(false);
       return;
     }
-    // When content is doubled for seamless looping, scrollHeight is ~2x the
-    // real content. Measure against half so we correctly detect when original
-    // cards fit after a resize / zoom change.
     const checkOverflow = () => {
-      const singleHeight = isDoubledRef.current
-        ? container.scrollHeight / 2
-        : container.scrollHeight;
-      setNeedsScroll(singleHeight > container.clientHeight);
+      setNeedsScroll(singleContent.offsetHeight > container.clientHeight);
     };
     checkOverflow();
-    // Recheck on resize
+    // Recheck on resize / zoom
     const observer = new ResizeObserver(checkOverflow);
     observer.observe(container);
     return () => observer.disconnect();
@@ -130,7 +124,9 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
     const step = (time: number) => {
       if (lastTime !== null) {
         const dt = time - lastTime;
-        const contentHeight = container.scrollHeight / 2;
+        // Use the duplicate group's DOM offset as the wrap-around point —
+        // this is the exact scroll position where the second copy begins.
+        const contentHeight = dupRef.current?.offsetTop ?? container.scrollHeight / 2;
         const maxScrollTop = container.scrollHeight - container.clientHeight;
 
         if (maxScrollTop > 0) {
@@ -160,7 +156,14 @@ function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed
     <div style={styles.cardsWrapper}>
       <div ref={containerRef} style={styles.cards}>
         <div style={styles.cardsInner}>
-          {displayEvents.map((e, i) => <EventCard key={`${e.id}-${i}`} event={e} />)}
+          <div ref={singleRef} style={styles.cardsGroup}>
+            {events.map((e) => <EventCard key={`orig-${e.id}`} event={e} />)}
+          </div>
+          {isDoubled && (
+            <div ref={dupRef} style={styles.cardsGroup}>
+              {events.map((e) => <EventCard key={`dup-${e.id}`} event={e} />)}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -197,6 +200,11 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'auto',
   },
   cardsInner: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  cardsGroup: {
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
