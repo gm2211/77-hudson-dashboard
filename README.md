@@ -2,17 +2,9 @@
 
 A digital signage dashboard for residential building lobbies. Displays real-time service status, upcoming events, and scrolling advisories on lobby screens.
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/gm2211/77-hudson-dashboard)
-
-## Features
-
-- **Service Status Board** — Track building services (Operational/Maintenance/Outage)
-- **Event Cards** — Announcements with images and markdown-formatted details
-- **Advisory Ticker** — Scrolling yellow banner for important notices
-- **Admin UI** — Draft/publish workflow with version history
-- **Real-time Updates** — Server-sent events for instant refresh
-
 ## Deploy to Render
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/gm2211/77-hudson-dashboard)
 
 Click the button above. Render reads `render.yaml` and auto-provisions:
 - A PostgreSQL database
