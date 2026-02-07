@@ -12,6 +12,48 @@ bd close <id>         # Complete work
 bd sync               # Sync with git
 ```
 
+## Change Workflow
+
+**For EVERY code change**, follow this workflow:
+
+### 1. Work in a Git Worktree
+
+Do NOT work directly on main. Create a worktree branch for your change:
+
+```bash
+git worktree add ../77-hudson-dashboard-<short-description> -b <branch-name>
+cd ../77-hudson-dashboard-<short-description>
+npm ci  # install deps in the worktree
+```
+
+When done, merge back to main and clean up:
+
+```bash
+cd /Users/gmecocci/projects/77-hudson-dashboard
+git merge <branch-name>
+git push
+git worktree remove ../77-hudson-dashboard-<short-description>
+git branch -d <branch-name>
+```
+
+### 2. Monitor Render Deployment After Push
+
+After every `git push` to main, you MUST monitor the Render deployment and display a progress bar to the user:
+
+1. Get the latest deploy: `list_deploys(serviceId: "srv-d63big0gjchc738v1irg", limit: 1)`
+2. Poll `get_deploy` every ~15-20 seconds
+3. Display progress using this format:
+   - `build_in_progress` → `███░░░░░░░ Building...`
+   - `update_in_progress` → `█████████░ Deploying...`
+   - `live` → `██████████ Live!`
+   - `build_failed` / `update_failed` / `deactivated` → report the failure
+4. Keep polling until status is `live` or a failure state
+
+**Render service ID:** `srv-d63big0gjchc738v1irg`
+**Live URL:** https://seven7-hudson-dashboard.onrender.com
+
+---
+
 ## Landing the Plane (Session Completion)
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
