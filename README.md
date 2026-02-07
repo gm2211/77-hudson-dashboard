@@ -85,20 +85,10 @@ npm run test:watch    # Run tests in watch mode
 
 ### Database Changes
 
-Edit `prisma/schema.prisma`, then:
-
 ```bash
+# Edit prisma/schema.prisma, then:
 npx prisma db push
 ```
-
-### Adding New Features
-
-1. Add model to `prisma/schema.prisma`
-2. Run `npx prisma db push`
-3. Create route in `server/routes/`
-4. Register in `server/app.ts`
-5. Add types to `src/types.ts`
-6. Build UI components
 
 ## License
 
