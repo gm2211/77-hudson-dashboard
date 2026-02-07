@@ -10,9 +10,6 @@ COPY . .
 # Generate Prisma client and build frontend + server
 RUN npm run build
 
-# Create empty database with schema applied (seeded on first start by the app)
-RUN npx prisma db push --skip-generate
-
 # --- Production ---
 FROM node:20-alpine
 
@@ -43,4 +40,4 @@ ENV NODE_ENV=production
 ENV PORT=3000
 EXPOSE 3000
 
-CMD ["node", "dist-server/index.js"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist-server/index.js"]
