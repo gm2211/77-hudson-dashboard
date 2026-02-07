@@ -1,7 +1,19 @@
+/** Escape HTML special characters to prevent XSS. */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /**
  * Parses a simple markdown string and returns HTML.
  * Supports: headers (#, ##, ###), bold, italic, strikethrough, inline code,
  * bullet lists (- or *), and numbered lists (1. 2. etc).
+ *
+ * All input is HTML-escaped before processing to prevent XSS.
  */
 export function parseMarkdown(md: string): string {
   const lines = md.split('\n');
@@ -16,7 +28,7 @@ export function parseMarkdown(md: string): string {
   const olLiStyle = 'display:flex;align-items:baseline;gap:8px;margin-bottom:4px;counter-increment:item';
 
   for (const line of lines) {
-    let processed = line;
+    let processed = escapeHtml(line);
 
     const bulletMatch = processed.match(/^[-*]\s+(.*)$/);
     const numberedMatch = processed.match(/^\d+\.\s+(.*)$/);

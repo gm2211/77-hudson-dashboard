@@ -10,5 +10,25 @@ export default defineConfig({
     // Run test files sequentially since they share a DB
     sequence: { concurrent: false },
     fileParallelism: false,
+    // Unit tests don't need DB setup
+    exclude: ['**/node_modules/**'],
+    projects: [
+      {
+        test: {
+          name: 'unit',
+          include: ['tests/unit/**/*.test.ts'],
+        },
+      },
+      {
+        test: {
+          name: 'api',
+          include: ['tests/api/**/*.test.ts'],
+          globalSetup: ['./tests/globalSetup.ts'],
+          setupFiles: ['./tests/setup.ts'],
+          sequence: { concurrent: false },
+          fileParallelism: false,
+        },
+      },
+    ],
   },
 });
