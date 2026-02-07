@@ -27,58 +27,12 @@
  * - server/routes/config.ts - API endpoint
  */
 import { useState, useEffect, useRef } from 'react';
-import type { CSSProperties } from 'react';
 import type { BuildingConfig } from '../../../types';
 import { api } from '../../../utils/api';
-
-/** Input style matching the admin theme */
-const inputStyle: CSSProperties = {
-  background: '#0a1628',
-  border: '1px solid rgba(255, 255, 255, 0.08)',
-  borderRadius: '6px',
-  padding: '8px 12px',
-  color: '#e0e0e0',
-  fontSize: '14px',
-};
-
-/** Style for inputs with changed values */
-const inputChangedStyle: CSSProperties = {
-  borderColor: 'rgba(255, 193, 7, 0.6)',
-  boxShadow: '0 0 6px rgba(255, 193, 7, 0.3)',
-};
-
-/** Section container style */
-const sectionStyle: CSSProperties = {
-  background: '#132038',
-  borderRadius: '12px',
-  border: '1px solid #1a3050',
-  padding: '20px',
-  marginBottom: '20px',
-};
-
-/** Section with changes indicator */
-const sectionChangedStyle: CSSProperties = {
-  borderLeft: '3px solid #ffc107',
-};
-
-/** Form group container */
-const formGroupStyle: CSSProperties = {
-  background: 'rgba(0, 0, 0, 0.2)',
-  borderRadius: '8px',
-  padding: '12px',
-  marginBottom: '16px',
-  border: '1px solid rgba(255, 255, 255, 0.05)',
-};
-
-/** Form label style */
-const formLabelStyle: CSSProperties = {
-  fontSize: '11px',
-  color: '#888',
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px',
-  marginBottom: '8px',
-  display: 'block',
-};
+import {
+  inputStyle, inputChangedStyle, sectionStyle, sectionChangedStyle,
+  formGroupStyle, formLabelStyle,
+} from '../../../styles';
 
 interface ConfigSectionProps {
   /** Current building configuration */
