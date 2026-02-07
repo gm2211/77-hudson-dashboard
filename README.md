@@ -34,13 +34,6 @@ npm run dev
 
 To stop Postgres: `docker compose down` (data persists in the Docker volume).
 
-## Tech Stack
-
-- **Frontend**: React 19 + Vite + TypeScript
-- **Backend**: Express (serves API + Vite dev middleware)
-- **Database**: PostgreSQL via Prisma ORM
-- **Styling**: Inline style objects (teal/dark theme)
-
 ## Project Structure
 
 ```
