@@ -49,7 +49,6 @@ import { Router } from 'express';
 import prisma from '../db.js';
 import { broadcast } from '../sse.js';
 import { asyncHandler, NotFoundError, ValidationError } from '../middleware/errorHandler.js';
-import { Prisma } from '@prisma/client';
 
 const router = Router();
 
@@ -174,6 +173,7 @@ interface ServiceItem {
   notes?: string;
   sortOrder: number;
   lastChecked: string;
+  markedForDeletion?: boolean;
 }
 
 interface EventItem {
@@ -184,6 +184,7 @@ interface EventItem {
   imageUrl: string;
   accentColor: string;
   sortOrder: number;
+  markedForDeletion?: boolean;
 }
 
 interface AdvisoryItem {
@@ -191,6 +192,7 @@ interface AdvisoryItem {
   label: string;
   message: string;
   active: boolean;
+  markedForDeletion?: boolean;
 }
 
 /**
@@ -305,7 +307,7 @@ function computeDiff(from: SnapshotData, to: SnapshotData) {
   // Services diff
   const fromServicesMap = new Map((from.services?.items || []).map(s => [s.id, s]));
   const toServicesMap = new Map(
-    (to.services?.items || []).filter(s => !(s as unknown as { markedForDeletion?: boolean }).markedForDeletion).map(s => [s.id, s])
+    (to.services?.items || []).filter(s => !s.markedForDeletion).map(s => [s.id, s])
   );
 
   for (const [id, service] of toServicesMap) {
@@ -313,7 +315,7 @@ function computeDiff(from: SnapshotData, to: SnapshotData) {
       diff.services.added.push(service);
     } else {
       const fromService = fromServicesMap.get(id)!;
-      if (hasFieldChanges(fromService as unknown as Record<string, unknown>, service as unknown as Record<string, unknown>, ['name', 'status', 'notes'])) {
+      if (hasFieldChanges(fromService as Record<string, unknown>, service as Record<string, unknown>, ['name', 'status', 'notes'])) {
         diff.services.changed.push({ from: fromService, to: service });
       }
     }
@@ -327,7 +329,7 @@ function computeDiff(from: SnapshotData, to: SnapshotData) {
   // Events diff
   const fromEventsMap = new Map((from.events?.items || []).map(e => [e.id, e]));
   const toEventsMap = new Map(
-    (to.events?.items || []).filter(e => !(e as unknown as { markedForDeletion?: boolean }).markedForDeletion).map(e => [e.id, e])
+    (to.events?.items || []).filter(e => !e.markedForDeletion).map(e => [e.id, e])
   );
 
   for (const [id, event] of toEventsMap) {
@@ -336,7 +338,7 @@ function computeDiff(from: SnapshotData, to: SnapshotData) {
     } else {
       const fromEvent = fromEventsMap.get(id)!;
       if (
-        hasFieldChanges(fromEvent as unknown as Record<string, unknown>, event as unknown as Record<string, unknown>, ['title', 'subtitle', 'imageUrl']) ||
+        hasFieldChanges(fromEvent as Record<string, unknown>, event as Record<string, unknown>, ['title', 'subtitle', 'imageUrl']) ||
         JSON.stringify(fromEvent.details) !== JSON.stringify(event.details)
       ) {
         diff.events.changed.push({ from: fromEvent, to: event });
@@ -352,7 +354,7 @@ function computeDiff(from: SnapshotData, to: SnapshotData) {
   // Advisories diff
   const fromAdvisoriesMap = new Map((from.advisories?.items || []).map(a => [a.id, a]));
   const toAdvisoriesMap = new Map(
-    (to.advisories?.items || []).filter(a => !(a as unknown as { markedForDeletion?: boolean }).markedForDeletion).map(a => [a.id, a])
+    (to.advisories?.items || []).filter(a => !a.markedForDeletion).map(a => [a.id, a])
   );
 
   for (const [id, advisory] of toAdvisoriesMap) {
@@ -360,7 +362,7 @@ function computeDiff(from: SnapshotData, to: SnapshotData) {
       diff.advisories.added.push(advisory);
     } else {
       const fromAdvisory = fromAdvisoriesMap.get(id)!;
-      if (hasFieldChanges(fromAdvisory as unknown as Record<string, unknown>, advisory as unknown as Record<string, unknown>, ['label', 'message', 'active'])) {
+      if (hasFieldChanges(fromAdvisory as Record<string, unknown>, advisory as Record<string, unknown>, ['label', 'message', 'active'])) {
         diff.advisories.changed.push({ from: fromAdvisory, to: advisory });
       }
     }
