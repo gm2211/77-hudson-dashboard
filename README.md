@@ -4,22 +4,15 @@ A digital signage dashboard for residential building lobbies. Displays real-time
 
 ## Deploy
 
-### Heroku (recommended — true one-click)
-
-[![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/gm2211/77-hudson-dashboard)
-
-Click the button, pick an app name, and deploy. Heroku auto-provisions PostgreSQL, runs migrations, and seeds demo data. Auto-deploys on every push. Requires a Heroku account (Postgres starts at $5/mo).
-
-### Render
-
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/gm2211/77-hudson-dashboard)
 
 Click the button above. Render reads `render.yaml` and auto-provisions a PostgreSQL database and web service. The app seeds itself with demo data on first start. Free tier available (DB expires after 90 days).
 
-> **Note:** The quick deploy button uses the repo as a public URL. This means **auto-deploy on push** won't be available. For auto-deploy, use the full setup below.
+> [!WARNING]
+> The quick deploy button uses the repo as a public URL. This means **auto-deploy on push won't be available**. To get auto-deploy, fork the repo and connect it to Render via the full setup below.
 
 <details>
-<summary><strong>Render full setup (enables auto-deploy)</strong></summary>
+<summary><strong>Full setup (enables auto-deploy)</strong></summary>
 
 1. **Fork this repo** — Click [Fork](https://github.com/gm2211/77-hudson-dashboard/fork) to create your own copy
 2. **Connect GitHub to Render** — Go to [Render Dashboard](https://dashboard.render.com) and connect your GitHub account under Account Settings if you haven't already
