@@ -77,7 +77,7 @@ export default function AdvisoryTicker({ advisories, tickerSpeed = DEFAULTS.TICK
 
   return (
     <div style={styles.ticker} ref={containerRef}>
-      <div style={styles.track}>
+      <div style={{ ...styles.track, padding: shouldScroll ? '8px 0' : '8px 16px' }}>
         <div ref={innerRef} style={{ ...styles.scroll, willChange: shouldScroll ? 'transform' : 'auto', justifyContent: shouldScroll ? 'flex-start' : 'center' }}>
           <div ref={singleRef} style={styles.group}>
             {labels}
