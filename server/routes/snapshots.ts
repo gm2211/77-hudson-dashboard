@@ -444,7 +444,7 @@ router.get(
     };
 
     const hasChanges = Object.values(sectionChanges).some(Boolean);
-    res.json({ hasChanges, sectionChanges, published: toApiFormat(published as Awaited<ReturnType<typeof getCurrentState>>) });
+    res.json({ hasChanges, sectionChanges, published: toApiFormat(published as Awaited<ReturnType<typeof getCurrentState>>), current: toApiFormat(current) });
   })
 );
 

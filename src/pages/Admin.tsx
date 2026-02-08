@@ -35,36 +35,30 @@ export default function Admin() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const load = useCallback(async () => {
-    const [servicesData, eventsData, advisoriesData, configData] = await Promise.all([
-      api.get('/api/services'),
-      api.get('/api/events'),
-      api.get('/api/advisories'),
-      api.get('/api/config'),
-    ]);
-    setServices(servicesData);
-    setEvents(eventsData);
-    setAdvisories(advisoriesData);
-    setConfig(configData);
-  }, []);
-
   const checkDraft = useCallback(async () => {
     const d = await api.get('/api/snapshots/draft-status');
     setHasChanges(d.hasChanges);
     setSectionChanges(d.sectionChanges || { config: false, services: false, events: false, advisories: false });
     setPublished(d.published || null);
+    // Use current data from draft-status to avoid a separate load() call
+    if (d.current) {
+      setServices(d.current.services || []);
+      setEvents(d.current.events || []);
+      setAdvisories(d.current.advisories || []);
+      setConfig(d.current.config || null);
+    }
   }, []);
 
   const onSave = useCallback(async () => {
-    await Promise.all([load(), checkDraft()]);
-  }, [load, checkDraft]);
+    await checkDraft();
+  }, [checkDraft]);
 
   // Lighter callback for config changes - doesn't reload config
   const onConfigSave = useCallback(() => {
     checkDraft();
   }, [checkDraft]);
 
-  useEffect(() => { load(); checkDraft(); }, [load, checkDraft]);
+  useEffect(() => { checkDraft(); }, [checkDraft]);
 
   // Lock body scroll when modal is open
   useEffect(() => {
