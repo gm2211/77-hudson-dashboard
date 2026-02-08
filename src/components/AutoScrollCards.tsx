@@ -82,7 +82,12 @@ export default function AutoScrollCards({ events, scrollSpeed }: { events: Event
     };
 
     animId = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(animId);
+    return () => {
+      cancelAnimationFrame(animId);
+      // Reset transform so cards aren't stuck offset when scrolling stops
+      offsetRef.current = 0;
+      inner.style.transform = '';
+    };
   }, [shouldScroll, needsScroll, scrollSpeed, events.length]);
 
   return (
