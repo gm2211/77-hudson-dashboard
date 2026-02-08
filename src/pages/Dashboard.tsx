@@ -67,7 +67,8 @@ export default function Dashboard() {
       <style>{`
         html, body { overflow: hidden; height: 100%; background: #fff; }
         #root { height: 100%; }
-        *::-webkit-scrollbar { display: none; }
+        * { scrollbar-width: none; }
+        *::-webkit-scrollbar { width: 0; height: 0; }
       `}</style>
     </div>
   );

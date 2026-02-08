@@ -1,20 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import EventCard from './EventCard';
 import type { Event } from '../types';
-
-// Temporary debug logger — sends to backend so we can see in Render logs
-const _loggedOnce = new Set<string>();
-function debugLog(message: string, data?: Record<string, unknown>) {
-  const key = message + JSON.stringify(data);
-  if (_loggedOnce.has(key)) return;
-  _loggedOnce.add(key);
-  console.log('[AutoScroll]', message, data);
-  fetch('/api/client-log', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ level: 'debug', message: `[AutoScroll] ${message}`, data }),
-  }).catch(() => {});
-}
 
 /**
  * Auto-scrolling event cards with seamless loop.
@@ -25,6 +11,9 @@ function debugLog(message: string, data?: Record<string, unknown>) {
  * 2. Must accumulate fractional pixels and only call scrollBy() when >= 1px,
  *    because browsers ignore sub-pixel scrollTop assignments
  * 3. Use scrollBy({ top, behavior: 'instant' }) not direct scrollTop assignment
+ * 4. Do NOT use `*::-webkit-scrollbar { display: none }` — Safari silently
+ *    breaks scrollBy() when the scrollbar pseudo-element is display:none.
+ *    Use `scrollbar-width: none` + `::-webkit-scrollbar { width: 0 }` instead.
  */
 export default function AutoScrollCards({ events, scrollSpeed }: { events: Event[]; scrollSpeed: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -35,24 +24,17 @@ export default function AutoScrollCards({ events, scrollSpeed }: { events: Event
   const shouldScroll = events.length > 0 && scrollSpeed > 0;
   const isDoubled = shouldScroll && needsScroll;
 
-  debugLog('render', { eventCount: events.length, scrollSpeed, shouldScroll, needsScroll, isDoubled });
-
   // Check if content overflows and we need scrolling.
   // Measures the single-content group directly — no ratio assumptions.
   useEffect(() => {
     const container = containerRef.current;
     const singleContent = singleRef.current;
     if (!container || !singleContent || !shouldScroll) {
-      debugLog('overflow-check: skipped', { hasContainer: !!container, hasSingleContent: !!singleContent, shouldScroll });
       setNeedsScroll(false);
       return;
     }
     const checkOverflow = () => {
-      const contentH = singleContent.offsetHeight;
-      const containerH = container.clientHeight;
-      const overflows = contentH > containerH;
-      debugLog('overflow-check', { contentH, containerH, overflows, scrollHeight: container.scrollHeight });
-      setNeedsScroll(overflows);
+      setNeedsScroll(singleContent.offsetHeight > container.clientHeight);
     };
     checkOverflow();
     // Recheck on resize / zoom
@@ -61,18 +43,9 @@ export default function AutoScrollCards({ events, scrollSpeed }: { events: Event
     return () => observer.disconnect();
   }, [shouldScroll, events.length]);
 
-  // Log animation state once when it starts
-  const loggedAnimStart = useRef(false);
-  const loggedScrollBy = useRef(false);
-
   // Run the scroll animation
   useEffect(() => {
-    loggedAnimStart.current = false;
-    loggedScrollBy.current = false;
-    if (!shouldScroll || !needsScroll) {
-      debugLog('animation: not starting', { shouldScroll, needsScroll });
-      return;
-    }
+    if (!shouldScroll || !needsScroll) return;
     const container = containerRef.current;
     if (!container) return;
 
@@ -88,33 +61,13 @@ export default function AutoScrollCards({ events, scrollSpeed }: { events: Event
         const contentHeight = dupRef.current?.offsetTop ?? container.scrollHeight / 2;
         const maxScrollTop = container.scrollHeight - container.clientHeight;
 
-        if (!loggedAnimStart.current) {
-          loggedAnimStart.current = true;
-          debugLog('animation: running', {
-            contentHeight, maxScrollTop,
-            scrollHeight: container.scrollHeight,
-            clientHeight: container.clientHeight,
-            scrollTop: container.scrollTop,
-            dupOffsetTop: dupRef.current?.offsetTop,
-          });
-        }
-
         if (maxScrollTop > 0) {
           const pxPerMs = contentHeight / (scrollSpeed * 1000);
           accumulatedScroll += pxPerMs * dt;
 
           if (accumulatedScroll >= 1) {
             const scrollAmount = Math.floor(accumulatedScroll);
-            const beforeScroll = container.scrollTop;
             container.scrollBy({ top: scrollAmount, behavior: 'instant' });
-            const afterScroll = container.scrollTop;
-            if (!loggedScrollBy.current) {
-              loggedScrollBy.current = true;
-              debugLog('scrollBy result', {
-                scrollAmount, beforeScroll, afterScroll,
-                didMove: afterScroll !== beforeScroll,
-              });
-            }
             accumulatedScroll -= scrollAmount;
           }
 
