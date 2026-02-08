@@ -87,14 +87,6 @@ app.post('/api/upload', (req: Request, res: Response) => {
   });
 });
 
-// Client-side log forwarder — temporary debugging aid
-app.post('/api/client-log', (req: Request, res: Response) => {
-  const { level = 'info', message, data } = req.body || {};
-  const prefix = `[CLIENT ${String(level).toUpperCase()}]`;
-  console.log(prefix, message, data !== undefined ? JSON.stringify(data) : '');
-  res.json({ ok: true });
-});
-
 // Global error handler - MUST be after all routes
 app.use(errorHandler);
 
