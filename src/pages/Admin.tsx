@@ -49,12 +49,21 @@ export default function Admin() {
     }
   }, []);
 
-  const onSave = useCallback(async () => {
-    await checkDraft();
-  }, [checkDraft]);
-
-  // Lighter callback for config changes - doesn't reload config
-  const onConfigSave = useCallback(() => {
+  // onSave accepts an optional optimistic update for instant UI feedback.
+  // The server is synced in the background via checkDraft().
+  const onSave = useCallback((optimistic?: {
+    services?: Service[];
+    events?: Event[];
+    advisories?: Advisory[];
+    config?: BuildingConfig | null;
+  }) => {
+    if (optimistic) {
+      if (optimistic.services) setServices(optimistic.services);
+      if (optimistic.events) setEvents(optimistic.events);
+      if (optimistic.advisories) setAdvisories(optimistic.advisories);
+      if (optimistic.config !== undefined) setConfig(optimistic.config);
+      setHasChanges(true);
+    }
     checkDraft();
   }, [checkDraft]);
 

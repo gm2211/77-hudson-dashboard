@@ -45,8 +45,8 @@ interface ServicesSectionProps {
   services: Service[];
   /** Building config for scroll speed */
   config: BuildingConfig | null;
-  /** Callback after any change */
-  onSave: () => void;
+  /** Callback after any change. Pass optimistic data for instant UI update. */
+  onSave: (optimistic?: { services?: Service[] }) => void;
   /** Whether this section has unpublished changes */
   hasChanged: boolean;
   /** Last published services for diff */
@@ -73,42 +73,44 @@ export function ServicesSection({
     if (config) setServicesScrollSpeedText(String(config.servicesScrollSpeed));
   }, [config]);
 
-  const saveServicesScrollSpeed = async (text: string) => {
+  const saveServicesScrollSpeed = (text: string) => {
     const val = text === '' ? 0 : Math.max(0, Number(text));
     setServicesScrollSpeedText(String(val));
-    await api.put('/api/config', { servicesScrollSpeed: val });
+    api.put('/api/config', { servicesScrollSpeed: val });
     onSave();
   };
 
   const add = async () => {
     if (!name) return;
+    // New item — can't predict ID, so await and sync
     await api.post('/api/services', { name, status, sortOrder: services.length });
     setName('');
     setFormExpanded(false);
     onSave();
   };
 
-  const markForDeletion = async (id: number) => {
-    await api.del(`/api/services/${id}`);
-    onSave();
+  const markForDeletion = (id: number) => {
+    const updated = services.map(s => s.id === id ? { ...s, markedForDeletion: true } : s);
+    api.del(`/api/services/${id}`);
+    onSave({ services: updated });
   };
 
-  const unmarkForDeletion = async (id: number) => {
-    await api.post(`/api/services/${id}/unmark`);
-    onSave();
+  const unmarkForDeletion = (id: number) => {
+    const updated = services.map(s => s.id === id ? { ...s, markedForDeletion: false } : s);
+    api.post(`/api/services/${id}/unmark`);
+    onSave({ services: updated });
   };
 
-  const changeStatus = async (s: Service, newStatus: string) => {
-    await api.put(`/api/services/${s.id}`, {
-      status: newStatus,
-      lastChecked: new Date().toISOString(),
-    });
-    onSave();
+  const changeStatus = (s: Service, newStatus: string) => {
+    const updated = services.map(svc => svc.id === s.id ? { ...svc, status: newStatus as Service['status'], lastChecked: new Date().toISOString() } : svc);
+    api.put(`/api/services/${s.id}`, { status: newStatus, lastChecked: new Date().toISOString() });
+    onSave({ services: updated });
   };
 
-  const updateNotes = async (s: Service, notes: string) => {
-    await api.put(`/api/services/${s.id}`, { notes });
-    onSave();
+  const updateNotes = (s: Service, notes: string) => {
+    const updated = services.map(svc => svc.id === s.id ? { ...svc, notes } : svc);
+    api.put(`/api/services/${s.id}`, { notes });
+    onSave({ services: updated });
   };
 
   const getPublishedService = (id: number): Service | undefined => {

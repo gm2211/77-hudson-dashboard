@@ -38,7 +38,7 @@ interface ConfigSectionProps {
   /** Current building configuration */
   config: BuildingConfig | null;
   /** Callback after save completes */
-  onSave: () => void;
+  onSave: (optimistic?: Record<string, unknown>) => void;
   /** Whether this section has unpublished changes */
   hasChanged: boolean;
   /** Last published config for diff comparison */

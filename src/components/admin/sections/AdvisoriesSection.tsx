@@ -72,8 +72,8 @@ interface AdvisoriesSectionProps {
   advisories: Advisory[];
   /** Building config for ticker speed */
   config: BuildingConfig | null;
-  /** Callback after any change */
-  onSave: () => void;
+  /** Callback after any change. Pass optimistic data for instant UI update. */
+  onSave: (optimistic?: { advisories?: Advisory[] }) => void;
   /** Whether this section has unpublished changes */
   hasChanged: boolean;
   /** Last published advisories for diff */
@@ -101,34 +101,39 @@ export function AdvisoriesSection({
     if (config) setTickerSpeedText(String(config.tickerSpeed));
   }, [config]);
 
-  const markForDeletion = async (id: number) => {
-    await api.del(`/api/advisories/${id}`);
-    onSave();
+  const markForDeletion = (id: number) => {
+    const updated = advisories.map(a => a.id === id ? { ...a, markedForDeletion: true } : a);
+    api.del(`/api/advisories/${id}`);
+    onSave({ advisories: updated });
   };
 
-  const unmarkForDeletion = async (id: number) => {
-    await api.post(`/api/advisories/${id}/unmark`);
-    onSave();
+  const unmarkForDeletion = (id: number) => {
+    const updated = advisories.map(a => a.id === id ? { ...a, markedForDeletion: false } : a);
+    api.post(`/api/advisories/${id}/unmark`);
+    onSave({ advisories: updated });
   };
 
-  const saveTickerSpeed = async (text: string) => {
+  const saveTickerSpeed = (text: string) => {
     const val = text === '' ? 0 : Math.max(0, Number(text));
     setTickerSpeedText(String(val));
-    await api.put('/api/config', { tickerSpeed: val });
+    api.put('/api/config', { tickerSpeed: val });
     onSave();
   };
 
   const submit = async () => {
     if (!form.message.trim()) return;
     if (editingId) {
-      await api.put(`/api/advisories/${editingId}`, form);
+      const updated = advisories.map(a => a.id === editingId ? { ...a, ...form } : a);
+      api.put(`/api/advisories/${editingId}`, form);
+      onSave({ advisories: updated });
     } else {
+      // New item — can't predict the ID, so just fire and sync
       await api.post('/api/advisories', form);
+      onSave();
     }
     setForm(empty);
     setEditingId(null);
     setFormExpanded(false);
-    onSave();
   };
 
   const startEdit = (a: Advisory) => {
@@ -149,9 +154,10 @@ export function AdvisoriesSection({
     setForm({ label: a.label, message: a.message });
   };
 
-  const toggleActive = async (a: Advisory) => {
-    await api.put(`/api/advisories/${a.id}`, { active: !a.active });
-    onSave();
+  const toggleActive = (a: Advisory) => {
+    const updated = advisories.map(adv => adv.id === a.id ? { ...adv, active: !adv.active } : adv);
+    api.put(`/api/advisories/${a.id}`, { active: !a.active });
+    onSave({ advisories: updated });
   };
 
   return (

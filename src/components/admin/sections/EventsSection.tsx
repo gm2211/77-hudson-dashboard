@@ -52,8 +52,8 @@ interface EventsSectionProps {
   events: Event[];
   /** Building config for scroll speed */
   config: BuildingConfig | null;
-  /** Callback after any change */
-  onSave: () => void;
+  /** Callback after any change. Pass optimistic data for instant UI update. */
+  onSave: (optimistic?: { events?: Event[] }) => void;
   /** Whether this section has unpublished changes */
   hasChanged: boolean;
   /** Last published events for diff */
@@ -81,24 +81,26 @@ export function EventsSection({
 
   const isFormOpen = formExpanded || editingId !== null;
 
-  const markForDeletion = async (id: number) => {
-    await api.del(`/api/events/${id}`);
-    onSave();
+  const markForDeletion = (id: number) => {
+    const updated = events.map(e => e.id === id ? { ...e, markedForDeletion: true } : e);
+    api.del(`/api/events/${id}`);
+    onSave({ events: updated });
   };
 
-  const unmarkForDeletion = async (id: number) => {
-    await api.post(`/api/events/${id}/unmark`);
-    onSave();
+  const unmarkForDeletion = (id: number) => {
+    const updated = events.map(e => e.id === id ? { ...e, markedForDeletion: false } : e);
+    api.post(`/api/events/${id}/unmark`);
+    onSave({ events: updated });
   };
 
   useEffect(() => {
     if (config) setScrollSpeedText(String(config.scrollSpeed));
   }, [config]);
 
-  const saveScrollSpeed = async (text: string) => {
+  const saveScrollSpeed = (text: string) => {
     const val = text === '' ? 0 : Math.max(0, Number(text));
     setScrollSpeedText(String(val));
-    await api.put('/api/config', { scrollSpeed: val });
+    api.put('/api/config', { scrollSpeed: val });
     onSave();
   };
 
@@ -118,14 +120,17 @@ export function EventsSection({
       sortOrder: events.length,
     };
     if (editingId) {
-      await api.put(`/api/events/${editingId}`, body);
+      const updated = events.map(e => e.id === editingId ? { ...e, title: body.title, subtitle: body.subtitle, details: body.details, imageUrl: body.imageUrl } : e);
+      api.put(`/api/events/${editingId}`, body);
+      onSave({ events: updated });
     } else {
+      // New item — can't predict ID, so await and sync
       await api.post('/api/events', body);
+      onSave();
     }
     setForm(empty);
     setEditingId(null);
     setFormExpanded(false);
-    onSave();
   };
 
   const startEdit = (e: Event) => {
