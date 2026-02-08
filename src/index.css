@@ -11,8 +11,9 @@ body {
   overflow-x: hidden;
 }
 
-@media (max-width: 768px) {
-  /* Dashboard mobile overrides */
+/* Phone-only: break out of the kiosk layout so the page scrolls naturally.
+   Only triggers on narrow phones — tablets and laptops keep auto-scroll. */
+@media (max-width: 480px) {
   html, body {
     overflow: auto !important;
     height: auto !important;
@@ -44,6 +45,11 @@ body {
   .service-table-wrapper {
     overflow-x: auto !important;
   }
+}
+
+/* Tablet/narrow window: lightweight layout adjustments that don't
+   break auto-scroll or the kiosk layout. */
+@media (max-width: 768px) {
   .header-row {
     flex-wrap: wrap;
     gap: 8px;
