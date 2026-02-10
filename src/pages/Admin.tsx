@@ -133,7 +133,7 @@ export default function Admin() {
           </div>
         </header>
 
-        <ConfigSection config={config} onSave={onConfigSave} hasChanged={sectionChanges.config} publishedConfig={published?.config || null} />
+        <ConfigSection config={config} onSave={onSave} hasChanged={sectionChanges.config} publishedConfig={published?.config || null} />
         <ServicesSection services={services} config={config} onSave={onSave} hasChanged={sectionChanges.services} publishedServices={published?.services || null} />
         <EventsSection events={events} config={config} onSave={onSave} hasChanged={sectionChanges.events} publishedEvents={published?.events || null} />
         <AdvisoriesSection advisories={advisories} config={config} onSave={onSave} hasChanged={sectionChanges.advisories} publishedAdvisories={published?.advisories || null} />
